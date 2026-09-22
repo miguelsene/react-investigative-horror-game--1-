@@ -49,6 +49,7 @@ export const App: React.FC = () => {
   const [worldArea, setWorldArea] = useState<'house' | 'street' | 'school' | 'schoolhall' | 'return'>('house');
   const [routeProgress, setRouteProgress] = useState(0);
   const [grades, setGrades] = useState<Record<string, Grade>>({});
+  const [isAreaLoading, setIsAreaLoading] = useState(false);
 
   const [streetThought, setStreetThought] = useState<string | null>(null);
   const streetThoughtTimer = useRef<number | null>(null);
@@ -88,6 +89,7 @@ export const App: React.FC = () => {
   const [showHint, setShowHint] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
   const [assetsReady, setAssetsReady] = useState(false);
+  const [isStartingGame, setIsStartingGame] = useState(false);
   const lastNoteRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -149,13 +151,44 @@ export const App: React.FC = () => {
     soundManager.resume();
     soundManager.startRain();
     soundManager.startDrone(45);
-    soundManager.startMusic();
   };
 
+  const startMenuMusic = useCallback(() => {
+    bootAudio();
+    soundManager.setMusicFile('/musicas/trilha_home.mp3');
+  }, []);
+
+  useEffect(() => {
+    if (activeScreen === 'main_menu') {
+      soundManager.transitionMusicFile('/musicas/trilha_home.mp3');
+    } else if (activeScreen === 'gameplay' && worldArea === 'house') {
+      soundManager.transitionMusicFile('/musicas/manha.mp3');
+    } else {
+      soundManager.stopMusic();
+    }
+  }, [activeScreen, worldArea]);
+
+  useEffect(() => {
+    if (activeScreen !== 'gameplay') return;
+    setIsAreaLoading(true);
+    const timer = window.setTimeout(() => setIsAreaLoading(false), 420);
+    return () => window.clearTimeout(timer);
+  }, [activeScreen, worldArea]);
+
+  // Switch to the house theme after leaving the title screen.
+  const enterHouseArea = useCallback(() => {
+    soundManager.setMusicFile('/musicas/manha.mp3');
+  }, []);
+
   const enterGameplay = useCallback(() => {
-    setActiveScreen('gameplay');
-    setShowHint(true);
-    setTimeout(() => setShowHint(false), 14000);
+    setIsStartingGame(true);
+    const loadingDuration = 4000 + Math.round(Math.random() * 4000);
+    window.setTimeout(() => {
+      setActiveScreen('gameplay');
+      setShowHint(true);
+      setIsStartingGame(false);
+      setTimeout(() => setShowHint(false), 14000);
+    }, loadingDuration);
   }, []);
 
   const enterDeveloperMode = useCallback(() => {
@@ -183,7 +216,63 @@ export const App: React.FC = () => {
     }));
     enterGameplay();
     showToast('Modo desenvolvedor: rotina doméstica concluída.');
+    // open dev quick-jump panel on entry
+    setDevPanelOpen(true);
   }, [enterGameplay, gameState, showToast]);
+
+  const [devPanelOpen, setDevPanelOpen] = useState(false);
+
+  const applyDevJump = useCallback((opts: { chapter: number; area: string; timePreset: string; customTime?: string }) => {
+    const { chapter, area, timePreset, customTime } = opts;
+    gameState.selectChapter(chapter);
+    // reset some story flags to provide a clean developer context
+    gameState.setStoryFlags((p) => ({ ...p, developer_mode: true }));
+    // Area mapping
+    if (area === 'house') {
+      setWorldArea('house');
+      gameState.setCurrentFloor(1);
+      gameState.setCurrentLocation('living_room');
+      // Change to morning music when entering the house
+      enterHouseArea();
+    } else if (area === 'street') {
+      setWorldArea('street');
+      gameState.setCurrentFloor(1);
+      gameState.setCurrentLocation('street_start');
+    } else if (area === 'school') {
+      setWorldArea('school');
+      gameState.setCurrentFloor(1);
+      gameState.setCurrentLocation('school_entrance');
+    } else if (area === 'schoolhall') {
+      setWorldArea('schoolhall');
+      gameState.setCurrentFloor(1);
+      gameState.setCurrentLocation('school_corridor');
+    } else if (area === 'return') {
+      setWorldArea('return');
+      gameState.setCurrentFloor(1);
+      gameState.setCurrentLocation('street_return');
+    }
+
+    // Time presets
+    if (timePreset === 'morning') {
+      gameState.setStoryFlags((p) => ({ ...p, morningStarted: true, breakfast_done: true }));
+      gameState.setCurrentTime(customTime ?? '07:00');
+    } else if (timePreset === 'school_morning') {
+      gameState.setStoryFlags((p) => ({ ...p, left_house_for_school: true }));
+      gameState.setCurrentTime(customTime ?? '07:28');
+    } else if (timePreset === 'school_dismissal') {
+      gameState.setStoryFlags((p) => ({ ...p, arrived_school: true }));
+      gameState.setCurrentTime(customTime ?? '15:30');
+    } else if (timePreset === 'night') {
+      gameState.setStoryFlags((p) => ({ ...p, returned_from_school: true }));
+      gameState.setCurrentTime(customTime ?? '21:43');
+    } else if (timePreset === 'custom') {
+      if (customTime) gameState.setCurrentTime(customTime);
+    }
+
+    // close panel after jump
+    setDevPanelOpen(false);
+    showToast(`Dev jump: capítulo ${chapter}, ${area} @ ${gameState.currentTime}`);
+  }, [gameState, showToast]);
 
   const handleStartGame = useCallback(
     (isNew: boolean) => {
@@ -603,7 +692,63 @@ export const App: React.FC = () => {
             setActiveScreen('combat');
           }}
           onDeveloper={enterDeveloperMode}
+          onAudioStart={startMenuMusic}
         />
+      )}
+
+      {isStartingGame && (
+        <div className="game-boot-loader" role="status" aria-live="polite">
+          <img className="game-boot-logo" src="/images/op_logo.png" alt="Ordem Paranormal" />
+          <div className="game-boot-status"><span className="game-boot-spinner" />Carregando</div>
+        </div>
+      )}
+
+      {/* Developer Quick-Jump Panel */}
+      {devPanelOpen && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center">
+          <div className="w-96 bg-[#0b0d10] border border-neutral-700 p-6 rounded-lg shadow-2xl">
+            <h3 className="font-title text-xl mb-3">Dev Quick Jump</h3>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm">Capítulo</label>
+              <select id="dev-chapter" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded">
+                {[1,2,3,4,5].map((c) => <option key={c} value={c}>Capítulo {c}</option>)}
+              </select>
+
+              <label className="text-sm">Área</label>
+              <select id="dev-area" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded">
+                <option value="house">Casa</option>
+                <option value="street">Rua (ida)</option>
+                <option value="schoolhall">Corredor da Escola</option>
+                <option value="school">Sala de Aula / Minigame</option>
+                <option value="return">Rua (volta)</option>
+              </select>
+
+              <label className="text-sm">Tempo / Preset</label>
+              <select id="dev-time" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded">
+                <option value="morning">Manhã (07:00)</option>
+                <option value="school_morning">Saída para escola (07:28)</option>
+                <option value="school_dismissal">Final das aulas (15:30)</option>
+                <option value="night">Noite (21:43)</option>
+                <option value="custom">Custom</option>
+              </select>
+              <input id="dev-custom-time" placeholder="HH:MM" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded" />
+
+              <div className="flex justify-end gap-2 mt-3">
+                <button className="px-3 py-1 bg-neutral-800 border border-neutral-700 rounded" onClick={() => setDevPanelOpen(false)}>Fechar</button>
+                <button
+                  className="px-3 py-1 bg-emerald-600 text-black rounded"
+                  onClick={() => {
+                    const ch = Number((document.getElementById('dev-chapter') as HTMLSelectElement).value || 1);
+                    const area = (document.getElementById('dev-area') as HTMLSelectElement).value || 'house';
+                    const timePreset = (document.getElementById('dev-time') as HTMLSelectElement).value || 'morning';
+                    const customTime = (document.getElementById('dev-custom-time') as HTMLInputElement).value || undefined;
+                    applyDevJump({ chapter: ch, area, timePreset, customTime });
+                  }}
+                >Ir</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {activeScreen === 'gameplay' && worldArea === 'house' && (
@@ -728,7 +873,15 @@ export const App: React.FC = () => {
           <SchoolWorld
             paused={anyModal || !!activeDialogueNode}
             cameraMotionEnabled={cameraMotionEnabled}
-            onTriggerDialogue={(id) => setActiveDialogueNode(DIALOGUE_NODES[id])}
+            onTriggerDialogue={(id, label) => {
+              const authored = DIALOGUE_NODES[id];
+              setActiveDialogueNode(authored ?? {
+                id: `school_thought_${id}`,
+                speaker: 'Pensamento',
+                avatar: 'gabriela_calm',
+                text: `${label ?? 'Isso'} parece comum à primeira vista. Mesmo assim, alguma coisa aqui me incomoda.`,
+              });
+            }}
             onSitAtDesk={() => {
               if (!nextSubject) {
                 showToast('As aulas de hoje terminaram.');
@@ -869,6 +1022,17 @@ export const App: React.FC = () => {
           }}
         />
       )}
+
+      {activeScreen === 'gameplay' && worldArea !== 'house' && (
+        <div className="fixed top-5 right-5 z-40 flex items-center gap-2">
+          <button className="hud-btn" title="Inventário [I]" onClick={() => { soundManager.playClockTick(); setIsInventoryOpen(true); }}><Package className="w-4 h-4" /></button>
+          <button className="hud-btn relative" title="Diário [J]" onClick={() => { soundManager.playClockTick(); setIsJournalOpen(true); }}><BookMarked className="w-4 h-4" /></button>
+          <button className="hud-btn" title="Quadro de pistas [Q]" onClick={() => { soundManager.playClockTick(); setIsEvidenceBoardOpen(true); }}><GitFork className="w-4 h-4" /></button>
+          <button className="hud-btn" title="Menu [ESC]" onClick={() => setIsSettingsOpen(true)}><Menu className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {isAreaLoading && <div className="area-loading" aria-live="polite"><div className="area-loading-mark" /><span>Carregando memória</span></div>}
 
       {isEvidenceBoardOpen && (
         <EvidenceBoard

@@ -193,6 +193,21 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 .title-in { animation: titleIn 3.4s ease-out both; letter-spacing: .28em; }
 @keyframes blinkSlow { 0%,100% { opacity: 1 } 50% { opacity: .12 } }
 .blink-slow { animation: blinkSlow 2.2s ease-in-out infinite; }
+.title-screen::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at 50% 40%, transparent 0 25%, rgba(5,3,4,.28) 55%, rgba(0,0,0,.88) 100%), linear-gradient(90deg, rgba(80,8,14,.25), transparent 30%, transparent 70%, rgba(80,8,14,.2)); }
+.title-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: .36; background-image: radial-gradient(circle at 14% 18%, #b22c39 0 2px, transparent 3px), radial-gradient(circle at 88% 19%, #7e222f 0 3px, transparent 4px), radial-gradient(circle at 78% 83%, #a23e42 0 2px, transparent 3px); background-size: 180px 150px, 230px 180px, 160px 130px; filter: blur(2px); animation: petalsDrift 14s linear infinite; }
+.title-screen-name { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; text-transform: uppercase; text-shadow: 0 0 3px #f5ecdc, 2px 0 rgba(168,30,32,.42), -2px 0 rgba(31,86,88,.34), 0 5px 24px rgba(0,0,0,.95); filter: contrast(1.15); }
+.title-screen-heading { transform: scale(.86); transform-origin: top center; }
+.title-brand img { width: min(280px, 52vw) !important; height: auto !important; opacity: .82 !important; filter: grayscale(1) sepia(.18) contrast(.82); }
+@keyframes petalsDrift { from { transform: translateY(-18px) } to { transform: translateY(28px) } }
+.game-boot-loader { position: fixed; inset: 0; z-index: 10001; display: grid; place-items: center; background: #000; animation: areaLoad .2s ease both; }
+.game-boot-logo { width: min(380px, 68vw); height: auto; opacity: .92; filter: grayscale(1) contrast(.9) brightness(1.45); }
+.game-boot-status { position: absolute; left: 28px; bottom: 24px; display: flex; align-items: center; gap: 10px; color: rgba(235,235,235,.6); font: 10px 'Shippori Mincho', serif; letter-spacing: .28em; text-transform: uppercase; }
+.game-boot-spinner { width: 17px; height: 17px; border: 1px solid rgba(255,255,255,.18); border-top-color: #ddd; border-radius: 50%; animation: bootSpin .75s linear infinite; }
+@keyframes bootSpin { to { transform: rotate(360deg); } }
+.area-loading { position: fixed; inset: 0; z-index: 10000; display: grid; place-content: center; gap: 13px; color: rgba(240,235,224,.8); background: rgba(5,6,8,.72); font: 10px 'Shippori Mincho', serif; letter-spacing: .42em; text-transform: uppercase; animation: areaLoad .42s ease both; pointer-events: none; }
+.area-loading-mark { width: 110px; height: 1px; background: linear-gradient(90deg, transparent, #bd3037, transparent); animation: loadingScan .72s ease-in-out infinite; }
+@keyframes areaLoad { from { opacity: 0 } to { opacity: 1 } }
+@keyframes loadingScan { 50% { transform: scaleX(.35); opacity: .35 } }
 
 /* ---------- Generic ---------- */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }

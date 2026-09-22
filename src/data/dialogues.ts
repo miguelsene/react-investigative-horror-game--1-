@@ -732,6 +732,96 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
     gabrielaAnalysis: 'Na página de guarda, uma pequena letra em tinta azul: "Para lembrar depois." Mãe...? Como esse exemplar veio parar aqui em Kyoto?',
   },
 
+  // Library shelf inspection dialogues
+  library_shelf_mystery: {
+    id: 'library_shelf_mystery', speaker: 'Gabriela', avatar: 'gabriela_calm',
+    text: 'Uma prateleira repleta de romances policiais e livros de mistério. Coberturas gastas, páginas amareladas pelo tempo.',
+    gabrielaAnalysis: 'Agatha Christie, Edgar Allan Poe, Arthur Conan Doyle... Os clássicos do gênero. Cada um desses livros contém um enigma que alguém resolveu.',
+    next: 'library_shelf_mystery_2',
+  },
+  library_shelf_mystery_2: {
+    id: 'library_shelf_mystery_2', speaker: 'Pensamento', avatar: 'gabriela_focus',
+    text: 'Um volume japonês de mistério policial ressalta entre os outros. A capa mostra uma andarilho em um caminho de montanha.',
+    gabrielaAnalysis: 'A ilustração é antiga, talvez dos anos 80. O estilo lembra os mangás de mystery que meu pai lia.',
+  },
+  library_shelf_poetry: {
+    id: 'library_shelf_poetry', speaker: 'Gabriela', avatar: 'gabriela_calm',
+    text: 'Poesia japonesa clássica e contemporânea. Haiku, tankas, poemas de Bashō e Buson.',
+    gabrielaAnalysis: 'A poesia é como a chuva em Kyoto — silenciosa, mas persistente. Cada palavra cai no papel como uma gota no telhado de telhas.',
+    next: 'library_shelf_poetry_2',
+  },
+  library_shelf_poetry_2: {
+    id: 'library_shelf_poetry_2', speaker: 'Pensamento', avatar: 'gabriela_calm',
+    text: 'Um livro de poesia moderna tem uma página marcada com um recortinho de café. "Para Gabriela" está escrito na capa.',
+    gabrielaAnalysis: 'Alguém quis deixar isso para mim. Mas quem? A letra é familiar... parecido com a de Yumi.',
+  },
+  library_shelf_astronomy: {
+    id: 'library_shelf_astronomy', speaker: 'Gabriela', avatar: 'gabriela_focus',
+    text: 'Livros de astronomia e ciências espaciais. Mapas estelares, fotos de nebulosas, teorias sobre buracos negros.',
+    gabrielaAnalysis: 'O universo é um mistério ainda maior que qualquer crime. Estrelas que morrem, galáxias que colidem... Temos olhado para o céu há milênios tentando entender.',
+    next: 'library_shelf_astronomy_2',
+  },
+  library_shelf_astronomy_2: {
+    id: 'library_shelf_astronomy_2', speaker: 'Pensamento', avatar: 'gabriela_focus',
+    text: 'Um atlas estelar japonês tem anotações de lápis nas margens. "Março - verão a estrela cadente" está escrito em kanji.',
+    gabrielaAnalysis: 'Alguém observou as estrelas aqui. Que bom. A escola precisa de mais pessoas que olhem para cima, não apenas para os relógios.',
+  },
+  library_shelf_history: {
+    id: 'library_shelf_history', speaker: 'Gabriela', avatar: 'gabriela_calm',
+    text: 'História de Kyoto — livros sobre templos, samurais, a era Edo, a Restauração Meiji.',
+    gabrielaAnalysis: 'Kyoto é uma cidade de camadas. Cada rua esconde outra época sob suas placas modernas.',
+    next: 'library_shelf_history_2',
+  },
+  library_shelf_history_2: {
+    id: 'library_shelf_history_2', speaker: 'Pensamento', avatar: 'gabriela_calm',
+    text: 'Um livro sobre o Templo Kiyomizu tem uma foto antiga inserida na página 47. Mostra uma menina de uniforme escolar nos anos 70.',
+    gabrielaAnalysis: 'A menina parece... familiar. Os mesmos cabelos curtos, o mesmo uniforme que eu uso. Quem era ela?',
+  },
+  library_shelf_science: {
+    id: 'library_shelf_science', speaker: 'Gabriela', avatar: 'gabriela_focus',
+    text: 'Ciências naturais: biologia, química, física. Livros didáticos e alguns mais avançados.',
+    gabrielaAnalysis: 'A ciência é sistemática como eu gosto. Hipótese, experimento, conclusão. Não há espaço para emoções nas equações.',
+    next: 'library_shelf_science_2',
+  },
+  library_shelf_science_2: {
+    id: 'library_shelf_science_2', speaker: 'Pensamento', avatar: 'gabriela_focus',
+    text: 'Um livro de química orgânica tem páginas grudadas juntas — alguém derramou algo. O cheiro de acidez ainda permanece.',
+    gabrielaAnalysis: 'Curioso. Alguém fez um experimento aqui sem permissão. Ou foi um acidente.',
+  },
+  library_shelf_philosophy: {
+    id: 'library_shelf_philosophy', speaker: 'Gabriela', avatar: 'gabriela_calm',
+    text: 'Filosofia ocidental e oriental. Kant, Nietzsche, Confúcio, Zhuangzi.',
+    gabrielaAnalysis: 'A filosofia pergunta o que todos evitam. O que é real? Para que servemos? As respostas mudam, mas as perguntas permanecem.',
+    next: 'library_shelf_philosophy_2',
+  },
+  library_shelf_philosophy_2: {
+    id: 'library_shelf_philosophy_2', speaker: 'Pensamento', avatar: 'gabriela_calm',
+    text: 'Um livro de filosofia oriental tem uma página destacada: "A mente tranquila é como a água parada — reflete a verdade."',
+    gabrielaAnalysis: 'Água parada reflete, mas também estagna. Às vezes preciso que as coisas se movam para entender.',
+  },
+  library_shelf_foreign: {
+    id: 'library_shelf_foreign', speaker: 'Gabriela', avatar: 'gabriela_focus',
+    text: 'Literatura estrangeira em tradução: Shakespeare, Dickens, García Márquez, Camus.',
+    gabrielaAnalysis: 'Cada cultura expressa a mesma solidão de formas diferentes. Shakespeare chora, Dickens observa, García Márquez sonha, Camus aceita.',
+    next: 'library_shelf_foreign_2',
+  },
+  library_shelf_foreign_2: {
+    id: 'library_shelf_foreign_2', speaker: 'Pensamento', avatar: 'gabriela_focus',
+    text: 'Um livro de Camus — "O Estrangeiro" — tem uma mão escrita na primeira página: "Para quem sente que não pertence."',
+    gabrielaAnalysis: 'Uma carta sem destinatário. Ou talvez para qualquer um que precise lê-la. Eu entendi essa frase.',
+  },
+  library_shelf_archive: {
+    id: 'library_shelf_archive', speaker: 'Gabriela', avatar: 'gabriela_calm',
+    text: 'Arquivo escolar — documentos antigos, registros de alunos, fotografias da escola através dos anos.',
+    gabrielaAnalysis: 'Arquivos guardam memórias que o tempo esqueceu. Cada documento é uma peça do quebra-cabeça do passado.',
+    next: 'library_shelf_archive_2',
+  },
+  library_shelf_archive_2: {
+    id: 'library_shelf_archive_2', speaker: 'Pensamento', avatar: 'gabriela_shock',
+    text: 'Um ano espacial de 1974 mostra um nome que eu reconheço... "Satomi Fujimoto" — minha mãe.',
+    gabrielaAnalysis: 'Ela estudou aqui. Aparece no registro como aluna do terceiro ano. Como eu. As mesmas aulas, o mesmo horário...',
+  },
+
   // Enfermaria: Reiko Arai
   nurse_reiko: {
     id: 'nurse_reiko', speaker: 'Desconhecido', speakerTitle: 'Reiko Arai (Enfermeira)', avatar: 'unknown_shadow',

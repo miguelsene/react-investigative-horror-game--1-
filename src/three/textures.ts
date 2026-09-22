@@ -748,3 +748,74 @@ export const gabrielaFallback = (facing: string, walk: number): THREE.CanvasText
   ctx.fillRect(33, 87 - lo, 8, 5);
   return mkTex(c, true);
 };
+
+export const artDisplayTex = (): THREE.CanvasTexture => {
+  const c = mkCanvas(256, 192);
+  const ctx = g2d(c);
+  // Abstract art display
+  ctx.fillStyle = '#f5f0e6';
+  ctx.fillRect(0, 0, 256, 192);
+  // Colorful abstract shapes
+  const colors = ['#c0262e', '#2b5fb3', '#e0a020', '#3f7a46', '#8a6a3a'];
+  colors.forEach((color, i) => {
+    ctx.fillStyle = color;
+    const x = 20 + i * 45 + Math.random() * 20;
+    const y = 30 + Math.random() * 120;
+    const w = 40 + Math.random() * 30;
+    const h = 30 + Math.random() * 40;
+    ctx.beginPath();
+    ctx.ellipse(x, y, w / 2, h / 2, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  // Brush strokes texture
+  ctx.strokeStyle = 'rgba(100,80,60,0.3)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 30; i++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * 256, Math.random() * 192);
+    ctx.lineTo(Math.random() * 256, Math.random() * 192);
+    ctx.stroke();
+  }
+  return mkTex(c);
+};
+
+export const firstAidTex = (): THREE.CanvasTexture => {
+  const c = mkCanvas(128, 96);
+  const ctx = g2d(c);
+  ctx.fillStyle = '#e8e8e8';
+  ctx.fillRect(0, 0, 128, 96);
+  ctx.fillStyle = '#c0262e';
+  ctx.fillRect(10, 10, 108, 76);
+  ctx.fillStyle = '#f5f5f5';
+  ctx.font = 'bold 28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('+', 64, 48);
+  return mkTex(c);
+};
+
+export const telephoneDialTex = (): THREE.CanvasTexture => {
+  const c = mkCanvas(128, 128);
+  const ctx = g2d(c);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath();
+  ctx.arc(64, 64, 56, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#2a2a2a';
+  ctx.beginPath();
+  ctx.arc(64, 64, 50, 0, Math.PI * 2);
+  ctx.fill();
+  // Numbers around the dial
+  const numbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+  numbers.forEach((n, i) => {
+    const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const x = 64 + Math.cos(angle) * 35;
+    const y = 64 + Math.sin(angle) * 35;
+    ctx.fillStyle = '#f0f0f0';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n, x, y);
+  });
+  return mkTex(c);
+};

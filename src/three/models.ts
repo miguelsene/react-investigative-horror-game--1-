@@ -4,8 +4,7 @@ import * as MT from './materialTextures';
 import * as AT from './advancedTextures';
 import { texturedMat, basicTexturedMat } from './assets';
 import { soundManager } from '../audio/soundManager';
-import { getChiyoArt, ART_ASPECT } from './characterArt';
-import { loadChiyoSheet, createChiyoSprite, type ChiyoSprite } from './chiyoSprite';
+import { createVovoSprite, preloadVovoSprite } from './vovoSprite';
 
 /* ============================================================
    PROCEDURAL 3D MODEL LIBRARY — every furniture / decor piece
@@ -797,6 +796,34 @@ export const lowTable = (): Built => {
   return B(g);
 };
 
+export const sideTable = (): Built => {
+  const g = G();
+  // Small table base
+  box(0.45, 0.05, 0.45, MAT.walnut, 0, 0.6, 0, g);
+  [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]].forEach(([x, z]) => box(0.04, 0.55, 0.04, MAT.walnut, x, 0.3, z, g));
+  // Table top
+  box(0.5, 0.03, 0.5, MAT.walnut, 0, 0.88, 0, g);
+  // Small lamp on the table
+  const lampBase = cyl(0.04, 0.06, 0.06, MAT.ceramicBlue, 0.15, 0.96, -0.1, g, 12);
+  const lampStem = cyl(0.015, 0.015, 0.15, MAT.brass, 0.15, 1.08, -0.1, g, 6);
+  const lampShade = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.18, 12, 1, true), new THREE.MeshStandardMaterial({
+    color: 0xf5e8c8,
+    emissive: 0xffd9a0,
+    emissiveIntensity: 0.4,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.85
+  }));
+  lampShade.position.set(0.15, 1.2, -0.1);
+  lampShade.rotation.x = Math.PI;
+  g.add(lampShade);
+  // Light point from the lamp
+  const lampLight = new THREE.PointLight(0xffd9a0, 0.5, 3, 2);
+  lampLight.position.set(0.15, 1.15, -0.1);
+  g.add(lampLight);
+  return B(g);
+};
+
 export const kimonoStand = (): Built => {
   const g = G();
   box(0.6, 0.06, 0.3, MAT.darkWood, 0, 0.03, 0, g);
@@ -978,44 +1005,175 @@ export const broom = (): Built => {
   return B(g);
 };
 
+// New furniture for school rooms
+
+export const computerDesk = (w: number): Built => {
+  const g = G();
+  box(w, 0.08, 0.7, MAT.darkWood, 0, 0.75, 0, g);
+  [[-w / 2 + 0.15, -0.25], [w / 2 - 0.15, -0.25]].forEach(([x, z]) => 
+    box(0.06, 0.7, 0.06, MAT.iron, x, 0.38, z, g)
+  );
+  box(w * 0.4, 0.04, 0.35, MAT.steel, 0, 0.82, 0.25, g);
+  box(w * 0.35, 0.25, 0.02, std(0x20242c, 0.4), 0, 0.97, 0.22, g);
+  const screenGlow = plane(w * 0.3, 0.2, glow(0x1a2a3e, 0x3f6f9f, 0.5), 0, 0.97, 0.24, g);
+  screenGlow.rotation.x = -Math.PI / 2;
+  cyl(0.015, 0.015, 0.25, MAT.iron, 0, 0.5, 0.3, g, 6);
+  return B(g);
+};
+
+export const printer = (): Built => {
+  const g = G();
+  box(0.5, 0.25, 0.4, std(0xd0d5dc, 0.3, 0.2), 0, 0.25, 0, g);
+  box(0.45, 0.02, 0.35, std(0x2a2e35, 0.5), 0, 0.38, 0.05, g);
+  [-0.2, 0.2].forEach((x) => box(0.03, 0.08, 0.03, MAT.black, x, 0.42, 0.15, g));
+  cyl(0.02, 0.02, 0.18, std(0xff6040, 0.4), -0.15, 0.43, 0.12, g, 12);
+  return B(g);
+};
+
+export const telephone = (): Built => {
+  const g = G();
+  box(0.15, 0.04, 0.15, MAT.walnut, 0, 0.72, 0, g);
+  cyl(0.02, 0.02, 0.6, MAT.black, 0, 0.45, 0, g, 6);
+  cyl(0.02, 0.01, 0.5, std(0x151a26, 0.9), 0.01, 0.82, 0.03, g, 10).rotation.x = 0.2;
+  box(0.22, 0.06, 0.12, MAT.black, 0, 1.06, 0.05, g);
+  [0.05, 0.08, -0.05, -0.08].forEach((x) => {
+    const ear = cyl(0.035, 0.02, 0.04, MAT.black, x, 1.09, 0.08, g, 8);
+    ear.rotation.x = Math.PI / 2;
+  });
+  const dial = plane(0.18, 0.18, basic(T.telephoneDialTex()), 0, 0.74, 0.07, g);
+  return B(g);
+};
+
+export const fileCabinet = (w: number): Built => {
+  const g = G();
+  box(w, 1.4, 0.5, MAT.walnut, 0, 0.7, 0, g);
+  const drawers = Math.floor(w / 0.5);
+  for (let i = 0; i < drawers; i++) {
+    const x = -w / 2 + 0.25 + i * 0.5;
+    box(0.44, 0.3, 0.02, MAT.darkWood, x, 1.0, 0.25, g);
+    box(0.02, 0.02, 0.02, MAT.brass, x + 0.12, 1.08, 0.26, g);
+    box(0.02, 0.02, 0.02, MAT.brass, x - 0.12, 1.08, 0.26, g);
+  }
+  return B(g);
+};
+
+export const whiteboard = (): Built => {
+  const g = G();
+  box(1.8, 0.05, 1.0, MAT.walnut, 0, 0.55, 0, g);
+  plane(1.7, 0.9, new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.9 }), 0, 0.55, 0.025, g);
+  cyl(0.02, 0.02, 1.8, MAT.iron, 0, 1.0, 0, g, 8);
+  return B(g);
+};
+
+export const easel = (): Built => {
+  const g = G();
+  cyl(0.02, 0.02, 1.4, MAT.darkWood, 0, 0.7, 0, g, 8).rotation.z = 0.08;
+  cyl(0.025, 0.015, 1.2, MAT.darkWood, 0, 0.6, 0.05, g, 8).rotation.z = -0.08;
+  box(0.85, 0.04, 0.6, MAT.darkWood, 0, 1.3, 0, g);
+  plane(0.8, 0.6, std(0xefe8d8, 0.95, 0, { side: THREE.DoubleSide }), 0, 1.35, 0.02, g);
+  return B(g);
+};
+
+export const paintingDisplay = (): Built => {
+  const g = G();
+  box(1.2, 0.04, 0.9, MAT.walnut, 0, 0.55, 0, g);
+  plane(1.1, 0.8, basic(T.artDisplayTex()), 0, 0.55, 0.02, g);
+  return B(g);
+};
+
+export const artSuppliesCabinet = (): Built => {
+  const g = G();
+  box(1.0, 1.2, 0.45, MAT.walnut, 0, 0.6, 0, g);
+  [0.15, 0.38, 0.61].forEach((y) => {
+    box(0.9, 0.03, 0.38, MAT.darkWood, 0, y, 0.22, g);
+    box(0.02, 0.02, 0.02, MAT.brass, 0.22, y + 0.02, 0.23, g);
+    box(0.02, 0.02, 0.02, MAT.brass, -0.22, y + 0.02, 0.23, g);
+  });
+  return B(g);
+};
+
+export const sculptureDisplay = (): Built => {
+  const g = G();
+  cyl(0.08, 0.1, 0.15, MAT.stone, 0, 0.12, 0, g, 12);
+  cyl(0.06, 0.08, 0.2, MAT.stone, 0, 0.3, 0, g, 10);
+  const head = sph(0.07, MAT.stone, 0, 0.42, 0, g, 10);
+  head.scale.y = 0.85;
+  return B(g);
+};
+
+export const lightFixture = (): Built => {
+  const g = G();
+  cyl(0.015, 0.015, 0.6, MAT.iron, 0, 0.3, 0, g, 6);
+  sph(0.06, glow(0xfff0e0, 0xffd090, 1.5), 0, 0.05, 0, g, 10);
+  const light = new THREE.PointLight(0xffd090, 0.6, 3, 2);
+  light.position.set(0, 0.05, 0);
+  g.add(light);
+  return B(g);
+};
+
+export const sinkUnit = (): Built => {
+  const g = G();
+  box(0.8, 0.9, 0.55, MAT.ceramic, 0, 0.45, 0, g);
+  box(0.75, 0.1, 0.5, std(0xe8e4dc, 0.2), 0, 0.85, 0.02, g);
+  cyl(0.15, 0.12, 0.4, std(0xe8e4dc, 0.3), 0, 0.7, 0.22, g, 12);
+  cyl(0.03, 0.02, 0.15, MAT.steel, 0, 0.88, 0.25, g, 8);
+  return B(g);
+};
+
+export const examinationTable = (): Built => {
+  const g = G();
+  box(1.2, 0.08, 0.6, MAT.darkWood, 0, 0.8, 0, g);
+  [[-0.5, -0.22], [0.5, -0.22], [-0.5, 0.22], [0.5, 0.22]].forEach(([x, z]) => 
+    box(0.06, 0.76, 0.06, MAT.iron, x, 0.4, z, g)
+  );
+  box(0.5, 0.4, 0.35, std(0xf0f0f0, 0.3), 0.4, 0.5, 0.1, g);
+  return B(g);
+};
+
+export const medicalCabinet = (): Built => {
+  const g = G();
+  box(0.8, 1.4, 0.45, MAT.walnut, 0, 0.7, 0, g);
+  [0.25, 0.5, 0.75, 1.0].forEach((y) => {
+    box(0.7, 0.2, 0.02, MAT.darkWood, 0, y, 0.22, g);
+    box(0.02, 0.02, 0.02, MAT.brass, 0.2, y + 0.02, 0.23, g);
+    box(0.02, 0.02, 0.02, MAT.brass, -0.2, y + 0.02, 0.23, g);
+  });
+  return B(g);
+};
+
+export const firstAidKit = (): Built => {
+  const g = G();
+  box(0.25, 0.12, 0.18, std(0xe0e0e0, 0.3), 0, 0.06, 0, g);
+  plane(0.22, 0.15, basic(T.firstAidTex()), 0, 0.06, 0.005, g);
+  return B(g);
+};
+
+export const stool = (): Built => {
+  const g = G();
+  cyl(0.04, 0.06, 0.5, MAT.walnut, 0, 0.28, 0, g, 10);
+  box(0.35, 0.04, 0.35, MAT.walnut, 0, 0.56, 0, g);
+  return B(g);
+};
+
 export const chiyo = (): Built => {
   const g = G();
-  const frames = getChiyoArt();
-  const mat = new THREE.SpriteMaterial({ map: frames[0], transparent: true, alphaTest: 0.02 });
-  const s = new THREE.Sprite(mat);
-  const H = 1.78;
-  s.scale.set(H * ART_ASPECT, H, 1);
-  s.position.y = H / 2 + 0.02;
-  g.add(s);
-
-  // Prefer a drawn sheet when one is available, exactly like Gabriela.
-  let raster: ChiyoSprite | null = null;
-  loadChiyoSheet().then((texture) => {
-    if (!texture || !g.parent) return;
-    raster = createChiyoSprite(texture);
-    raster.sprite.position.y = 0.02;
-    g.add(raster.sprite);
-    s.visible = false;
+  let sprite: ReturnType<typeof createVovoSprite> | null = null;
+  preloadVovoSprite().then((texture) => {
+    if (!g.parent) return;
+    sprite = createVovoSprite(texture);
+    sprite.center.set(0.5, 0);
+    // The single PNG has generous transparent side padding; widen its plane
+    // so Chiyo has the same visible body width as Gabriela.
+    sprite.scale.set(2.1, 1.8, 1);
+    sprite.position.y = 0.02;
+    g.add(sprite);
   });
+
   const sh = new THREE.Sprite(new THREE.SpriteMaterial({ map: T.softCircle('rgba(0,0,0,0.85)'), transparent: true, opacity: 0.45, depthWrite: false }));
   sh.scale.set(0.8, 0.4, 1);
   sh.position.y = 0.02;
   g.add(sh);
-  let frameTimer = 0;
-  let cur = 0;
-  const animate: Anim = (t, dt) => {
-    frameTimer += dt;
-    if (frameTimer <= 0.32) return;
-    frameTimer = 0;
-    cur += 1;
-    if (raster) {
-      // She stirs the pot in bursts, then rests for a moment.
-      raster.setFrame(cur, Math.sin(t * 0.25) > -0.2);
-    } else {
-      mat.map = frames[cur % frames.length];
-    }
-  };
-  return { group: g, animate };
+  return B(g);
 };
 
 export const noren = (w: number): Built => {
@@ -1108,6 +1266,30 @@ export const umbrellaStand = (): Built => {
   return B(g);
 };
 
+export const rack = (w: number): Built => {
+  const g = G();
+  // Shoe rack with multiple tiers
+  const tiers = Math.floor(w / 0.5);
+  for (let i = 0; i < tiers; i++) {
+    const x = -w / 2 + 0.25 + i * 0.5;
+    box(0.45, 0.15, 0.45, MAT.walnut, x, 0.4, 0, g);
+    box(0.45, 0.15, 0.45, MAT.walnut, x, 0.85, 0, g);
+    box(0.45, 0.15, 0.45, MAT.walnut, x, 1.3, 0, g);
+    // Dividers
+    box(0.02, 0.12, 0.44, MAT.darkWood, x - 0.1, 0.47, 0, g);
+    box(0.02, 0.12, 0.44, MAT.darkWood, x + 0.1, 0.47, 0, g);
+    box(0.02, 0.12, 0.44, MAT.darkWood, x - 0.1, 0.92, 0, g);
+    box(0.02, 0.12, 0.44, MAT.darkWood, x + 0.1, 0.92, 0, g);
+    box(0.02, 0.12, 0.44, MAT.darkWood, x - 0.1, 1.37, 0, g);
+    box(0.02, 0.12, 0.44, MAT.darkWood, x + 0.1, 1.37, 0, g);
+  }
+  // Legs
+  [[-w / 2 + 0.1, -0.15], [w / 2 - 0.1, -0.15]].forEach(([x, z]) => 
+    box(0.04, 0.4, 0.04, MAT.darkWood, x, 0.2, z, g)
+  );
+  return B(g);
+};
+
 export const slippers = (): Built => {
   const g = G();
   [-0.07, 0.07].forEach((x) => {
@@ -1187,6 +1369,23 @@ export const nightstand = (): Built => {
   return B(g);
 };
 
+export const readingTable = (): Built => {
+  const g = G();
+  // Simple wooden table for library reading
+  box(1.6, 0.06, 1.0, MAT.walnut, 0, 0.72, 0, g);
+  // Table legs
+  [[-0.72, -0.42], [0.72, -0.42], [-0.72, 0.42], [0.72, 0.42]].forEach(([x, z]) => 
+    box(0.05, 0.7, 0.05, MAT.walnut, x, 0.35, z, g)
+  );
+  // Small book on the table
+  box(0.25, 0.04, 0.35, pick(BOOK_MATS), 0.3, 0.76, 0.2, g);
+  box(0.25, 0.04, 0.33, pick(BOOK_MATS), 0.3, 0.76, -0.25, g);
+  // Coffee cup
+  cyl(0.05, 0.05, 0.08, MAT.ceramicBlue, -0.35, 0.77, 0.15, g, 12);
+  cyl(0.04, 0.04, 0.01, MAT.white, -0.35, 0.82, 0.15, g, 10);
+  return B(g);
+};
+
 export const desk = (): Built => {
   const g = G();
   box(2.15, 0.08, 0.95, MAT.darkWood, 0, 0.78, 0, g);
@@ -1251,7 +1450,8 @@ export const bookshelf = (w: number, h: number, rows: number): Built => {
   for (let r = 0; r < rows; r++) {
     const y = 0.05 + r * gap;
     box(w - 0.1, 0.04, 0.42, MAT.walnut, 0, y, 0, g);
-    if (r < rows - 1 || rnd() > 0.5) bookRow(g, 0, y + 0.02, 0.02, w - 0.2 - (r % 2) * 0.4);
+    // Always add books to every shelf row for a fuller look
+    bookRow(g, 0, y + 0.02, 0.02, w - 0.2 - (r % 2) * 0.4);
     if (r % 2 === 1) {
       box(0.3, 0.04, 0.22, pick(BOOK_MATS), w / 2 - 0.3, y + 0.04, 0.02, g);
       box(0.28, 0.04, 0.2, pick(BOOK_MATS), w / 2 - 0.3, y + 0.08, 0.02, g);

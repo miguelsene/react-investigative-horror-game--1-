@@ -355,6 +355,8 @@ export const buildFloor = (floor: 1 | 2, scene: THREE.Scene): HouseBuild => {
     put(Mo.cat(-4.2, -0.9, 1.9), 0, 0, 0);
 
     /* ---------- KITCHEN ---------- */
+
+    /* ---------- KITCHEN ---------- */
     put(Mo.kitchenCounter(3.8), 2.8, 0.16, -2.12, 0, [3.8, 0.85]);
     put(Mo.kitchenShelf(2.0), 3.4, 1.95, -2.44);
     put(Mo.rangeHood(), 1.85, 2.05, -2.2);

@@ -439,7 +439,8 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
     window.addEventListener('blur', onBlur);
 
     // ============ LOOP ============
-    const clock = new THREE.Clock();
+    const clock = new THREE.Timer();
+    clock.connect(document);
     let raf = 0;
     let stepTimer = 0;
     let facing: 'up' | 'down' | 'left' | 'right' = 'right';
@@ -447,8 +448,9 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
     let frameT = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
+      clock.update();
       const dt = Math.min(clock.getDelta(), 0.05);
-      const t = clock.elapsedTime;
+      const t = clock.getElapsed();
       if (document.hidden) return;
 
       // Animação dos NPCs
@@ -530,6 +532,7 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      clock.dispose();
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);

@@ -393,13 +393,97 @@ class SoundManager {
   private musicTimer: number | null = null;
   private musicNodes: AudioNode[] = [];
   private musicOn = false;
+  private musicBuffer: AudioBuffer | null = null;
+  private musicSource: AudioBufferSourceNode | null = null;
+  private musicFadeGain: GainNode | null = null;
+  private musicLoadId = 0;
+
+  public setMusicFile(url: string) {
+    if (!this.ctx || !this.musicGain) return;
+    const loadId = ++this.musicLoadId;
+    // Stop current music if playing
+    this.stopMusic();
+    
+    // Try to load the music file, but fallback to procedural if it fails
+    const loadTimeout = setTimeout(() => {
+      if (loadId === this.musicLoadId && !this.musicOn) {
+        console.warn('Music file load timeout, using procedural music');
+        this.startMusic(); // Fallback to procedural
+      }
+    }, 5000);
+    
+    // Load new music file
+    fetch(url)
+      .then(response => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.arrayBuffer();
+      })
+      .then(arrayBuffer => {
+        if (loadId !== this.musicLoadId) return;
+        clearTimeout(loadTimeout);
+        this.ctx!.decodeAudioData(arrayBuffer, (buffer) => {
+          if (loadId !== this.musicLoadId) return;
+          this.musicBuffer = buffer;
+          this.playMusicBuffer();
+        }, () => {
+          if (loadId !== this.musicLoadId) return;
+          clearTimeout(loadTimeout);
+          console.warn('Failed to decode audio file:', url, '- using procedural');
+          this.startMusic(); // Fallback to procedural
+        });
+      })
+      .catch(err => {
+        if (loadId !== this.musicLoadId) return;
+        clearTimeout(loadTimeout);
+        console.warn('Failed to load audio file:', url, err, '- using procedural');
+        this.startMusic(); // Fallback to procedural
+      });
+  }
+
+  /** Gently fades the current track before loading the next loop. */
+  public transitionMusicFile(url: string, duration = 650) {
+    if (!this.ctx || !this.musicSource || !this.musicFadeGain) {
+      this.setMusicFile(url);
+      return;
+    }
+    const oldSource = this.musicSource;
+    const oldGain = this.musicFadeGain;
+    const now = this.ctx.currentTime;
+    oldGain.gain.cancelScheduledValues(now);
+    oldGain.gain.setValueAtTime(Math.max(oldGain.gain.value, 0.0001), now);
+    oldGain.gain.exponentialRampToValueAtTime(0.0001, now + duration / 1000);
+    window.setTimeout(() => {
+      if (this.musicSource === oldSource) this.setMusicFile(url);
+    }, duration);
+  }
+
+  private playMusicBuffer() {
+    if (!this.ctx || !this.musicBuffer || !this.musicGain) return;
+    
+    this.musicSource = this.ctx.createBufferSource();
+    this.musicSource.buffer = this.musicBuffer;
+    this.musicSource.loop = true;
+    this.musicFadeGain = this.ctx.createGain();
+    this.musicFadeGain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+    this.musicSource.connect(this.musicFadeGain);
+    this.musicFadeGain.connect(this.musicGain);
+    this.musicSource.start();
+    this.musicFadeGain.gain.exponentialRampToValueAtTime(1, this.ctx.currentTime + 0.7);
+    this.musicOn = true;
+  }
 
   public startMusic() {
     if (!this.ctx || !this.musicGain || this.musicOn) return;
     this.musicOn = true;
     const ctx = this.ctx;
 
-    // bus with a gentle feedback delay ("room")
+    // If we have a loaded buffer, play that instead of procedural
+    if (this.musicBuffer) {
+      this.playMusicBuffer();
+      return;
+    }
+
+    // Otherwise play procedural music (original code continues...)
     const bus = ctx.createGain();
     bus.gain.value = 0.9;
     const delay = ctx.createDelay(2.0);
@@ -505,6 +589,15 @@ class SoundManager {
 
   public stopMusic() {
     this.musicOn = false;
+    if (this.musicSource) {
+      try {
+        this.musicSource.stop();
+        this.musicSource.disconnect();
+      } catch {}
+      this.musicSource = null;
+      this.musicFadeGain?.disconnect();
+      this.musicFadeGain = null;
+    }
     if (this.musicTimer) {
       clearTimeout(this.musicTimer);
       this.musicTimer = null;

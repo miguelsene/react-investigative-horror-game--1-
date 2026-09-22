@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { soundManager } from '../audio/soundManager';
-import { buildSchool, SchoolNpc } from '../three/schoolMap';
+import { buildSchool, SchoolDoor, SchoolNpc } from '../three/schoolMap';
 import { createGabrielaSprite, preloadGabrielaSprite } from '../three/gabrielaSprite';
 import { softCircle } from '../three/textures';
 import { ExplorationCamera } from '../three/cameraRig';
@@ -13,11 +13,11 @@ interface Props {
   paused: boolean;
   cameraMotionEnabled: boolean;
   onSitAtDesk: () => void;
-  onTriggerDialogue: (dialogueId: string) => void;
+  onTriggerDialogue: (dialogueId: string, label?: string) => void;
 }
 
-const hit = (x: number, z: number, colliders: { x: number; z: number; w: number; d: number }[]) =>
-  colliders.some((c) => Math.abs(x - c.x) < c.w / 2 + 0.24 && Math.abs(z - c.z) < c.d / 2 + 0.24);
+const hit = (x: number, z: number, colliders: { x: number; z: number; w: number; d: number; enabled?: boolean }[]) =>
+  colliders.some((c) => c.enabled !== false && Math.abs(x - c.x) < c.w / 2 + 0.24 && Math.abs(z - c.z) < c.d / 2 + 0.24);
 
 export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSitAtDesk, onTriggerDialogue }) => {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -46,24 +46,50 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xeef2ec);
-    scene.fog = new THREE.FogExp2(0xeef2ec, 0.018);
-    scene.add(new THREE.HemisphereLight(0xfffbe6, 0x6a6150, 1.45));
-    const sun = new THREE.DirectionalLight(0xfff0c8, 0.9);
+    scene.background = new THREE.Color(0x020304);
+    scene.fog = new THREE.FogExp2(0x090807, 0.045);
+    scene.add(new THREE.HemisphereLight(0xffe7b0, 0x121822, 1.15));
+    const sun = new THREE.DirectionalLight(0xffd68a, 1.15);
     sun.position.set(-10, 11, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(1024, 1024);
+    sun.shadow.camera.left = -32;
+    sun.shadow.camera.right = 32;
+    sun.shadow.camera.top = 22;
+    sun.shadow.camera.bottom = -22;
+    sun.shadow.bias = -0.0008;
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xcfe3ff, 0.4);
+    const fill = new THREE.DirectionalLight(0x9fb7d1, 0.34);
     fill.position.set(9, 7, -6);
     scene.add(fill);
-    const key = new THREE.PointLight(0xfff2cf, 0.8, 30, 2);
+    const key = new THREE.PointLight(0xffc86b, 1.15, 30, 2);
     key.position.set(0, 4.2, 0);
     scene.add(key);
 
     const school = buildSchool();
+    school.group.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
+    });
     scene.add(school.group);
+    [[-21, -12, 0xffbf6e], [-13, -12, 0xffd299], [-4, -12, 0xffc072], [5, -12, 0xffd8a2], [13, -12, 0xffa85f], [22, -12, 0xffd39c]].forEach(([x, z, color]) => {
+      const lamp = new THREE.PointLight(color, 0.62, 7, 2);
+      lamp.position.set(x, 3.05, z);
+      scene.add(lamp);
+    });
+    const dustPositions = new Float32Array(110 * 3);
+    for (let i = 0; i < 110; i++) { dustPositions[i * 3] = -25 + Math.random() * 50; dustPositions[i * 3 + 1] = 0.6 + Math.random() * 2.7; dustPositions[i * 3 + 2] = -17 + Math.random() * 22; }
+    const dustGeometry = new THREE.BufferGeometry();
+    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({ color: 0xf2d9ae, size: 0.035, transparent: true, opacity: 0.28, depthWrite: false }));
+    scene.add(dust);
+    const signMeshes: THREE.Mesh[] = (school.group as any).userData.signs || [];
+    let lastRoom: string | null = null;
 
     const camera = new THREE.PerspectiveCamera(46, mount.clientWidth / mount.clientHeight, 0.1, 90);
     // Start at entrance near getabako
@@ -94,11 +120,17 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     let frameTime = 0;
     let nearestNpc: SchoolNpc | null = null;
     let nearestSpot: SchoolSpot | null = null;
+    let nearestDoor: SchoolDoor | null = null;
     let nearDeskLocal = false;
     let currentMotionSpeed = 0;
 
     const talk = () => {
       if (live.current.paused) return;
+      if (nearestDoor) {
+        school.toggleDoor(nearestDoor.id);
+        soundManager.playDoorCreak();
+        return;
+      }
       if (nearDeskLocal && currentMotionSpeed < 0.3) {
         soundManager.playClueDiscovered();
         live.current.onSitAtDesk();
@@ -107,7 +139,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       if (nearestNpc) {
         soundManager.playClockTick();
         if (nearestNpc.dialogueNodeId) {
-          live.current.onTriggerDialogue(nearestNpc.dialogueNodeId);
+          live.current.onTriggerDialogue(nearestNpc.dialogueNodeId, nearestNpc.name);
         } else {
           setTalkingTo(nearestNpc);
           setLineIndex(0);
@@ -117,7 +149,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       if (nearestSpot) {
         soundManager.playClockTick();
         if (nearestSpot.dialogueNodeId) {
-          live.current.onTriggerDialogue(nearestSpot.dialogueNodeId);
+          live.current.onTriggerDialogue(nearestSpot.dialogueNodeId, nearestSpot.name);
         }
       }
     };
@@ -162,15 +194,22 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     window.addEventListener('blur', onBlur);
     window.addEventListener('wheel', onWheel, { passive: false });
 
-    const clock = new THREE.Clock();
+    const clock = new THREE.Timer();
+    clock.connect(document);
     let raf = 0;
     let stepTimer = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
+      clock.update();
       const dt = Math.min(clock.getDelta(), 0.05);
-      const t = clock.elapsedTime;
+      const t = clock.getElapsed();
       if (document.hidden) return;
       school.animate(t, dt);
+      for (let i = 0; i < dustPositions.length / 3; i++) {
+        dustPositions[i * 3] += Math.sin(t * 0.35 + i) * 0.0008;
+        dustPositions[i * 3 + 1] += Math.cos(t * 0.24 + i * 0.6) * 0.0005;
+      }
+      dustGeometry.attributes.position.needsUpdate = true;
 
       const oldX = pos.x;
       const oldZ = pos.z;
@@ -215,8 +254,20 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       shadow.position.set(pos.x, 0.035, pos.z);
 
       rig.update(pos, vx, vz, dt, t, zoomLevelRef.current, live.current.cameraMotionEnabled, live.current.paused);
+      school.updateCameraOcclusion(camera, pos);
 
       // Nearest interactable NPC
+      let bestDoor: SchoolDoor | null = null;
+      let bestDoorDist = 1.35;
+      school.doors.forEach((door) => {
+        const d = Math.hypot(door.x - pos.x, door.z - pos.z);
+        if (d < bestDoorDist) {
+          bestDoorDist = d;
+          bestDoor = door;
+        }
+      });
+      nearestDoor = bestDoor;
+
       let bestNpc: SchoolNpc | null = null;
       let bestNpcDist = 1.9;
       school.npcs.forEach((npc) => {
@@ -244,6 +295,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       nearDeskLocal = dDesk < 1.35;
 
       setHud(() => {
+        if (bestDoor) return `${bestDoor.isOpen ? 'FECHAR' : 'ABRIR'}: Porta da sala`;
         if (nearDeskLocal && currentMotionSpeed < 0.3) return 'SENTAR NA CARTEIRA: Sala 2-B';
         if (bestNpc) return `CONVERSAR: ${bestNpc.name}`;
         if (bestSpot) return `${bestSpot.type}: ${bestSpot.name}`;
@@ -252,6 +304,34 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
 
       const updater = (school.group as unknown as { updateBubbles?: (x: number, z: number) => void }).updateBubbles;
       updater?.(pos.x, pos.z);
+
+      // Determine current room by player position
+      const getRoomForPos = (x: number, z: number): string | null => {
+        // Library
+        if (x >= -8 && x <= 0 && z >= -18 && z <= -6) return 'library';
+        // Infirmary
+        if (x >= 2 && x <= 8 && z >= -18 && z <= -6) return 'infirmary';
+        // Secretary
+        if (x >= -16 && x <= -10 && z >= -18 && z <= -6) return 'secretary';
+        // Computer lab
+        if (x >= -24 && x <= -18 && z >= -18 && z <= -6) return 'computer';
+        // Art & Music
+        if (x >= 10 && x <= 16 && z >= -18 && z <= -6) return 'art';
+        // Classroom 2-B
+        if (x >= 17 && x <= 26 && z >= -18 && z <= -6) return '2-b';
+        // Entrance area
+        if (x >= -26 && x <= -18 && z >= -2 && z <= 6) return 'entrance';
+        return null;
+      };
+
+      const currentRoom = getRoomForPos(pos.x, pos.z);
+      if (currentRoom !== lastRoom) {
+        lastRoom = currentRoom;
+        // Toggle sign visibility: show only signs that match current room
+        signMeshes.forEach((m) => {
+          m.visible = !!(m.userData.room && currentRoom === m.userData.room);
+        });
+      }
 
       renderer.render(scene, camera);
     };
@@ -269,6 +349,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      clock.dispose();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
@@ -279,6 +360,8 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       shadowTex.dispose();
       shadow.geometry.dispose();
       (shadow.material as THREE.Material).dispose();
+      dustGeometry.dispose();
+      (dust.material as THREE.Material).dispose();
       renderer.dispose();
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
     };

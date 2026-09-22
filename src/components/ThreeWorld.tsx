@@ -130,7 +130,7 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.78;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -219,9 +219,9 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
     let character: ReturnType<typeof createGabrielaSprite> | null = null;
     const loadCharacter = () => {
       setSpriteStatus('loading');
-      preloadGabrielaSprite().then((texture) => {
+      preloadGabrielaSprite().then((gabrielaTex) => {
         if (disposed) return;
-        character = createGabrielaSprite(texture);
+        character = createGabrielaSprite(gabrielaTex);
         character.sprite.position.set(pos.x, 0.18, pos.z);
         scene.add(character.sprite);
         setSpriteStatus('ready');
@@ -299,13 +299,15 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
     window.addEventListener('blur', onBlur);
 
     /* ---------- LOOP ---------- */
-    const clock = new THREE.Clock();
+    const clock = new THREE.Timer();
+    clock.connect(document);
     let clockSignature = '';
     let animId = 0;
     const animate = () => {
       animId = requestAnimationFrame(animate);
+      clock.update();
       const dt = Math.min(clock.getDelta(), 0.05);
-      const t = clock.elapsedTime;
+      const t = clock.getElapsed();
       if (document.hidden) return;
       const l = live.current;
 
@@ -484,6 +486,7 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
       retrySpriteRef.current = null;
       cameraKick.current = null;
       cancelAnimationFrame(animId);
+      clock.dispose();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);

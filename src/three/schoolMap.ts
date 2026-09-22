@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Anim } from './models';
 import * as T from './textures';
 import { createSilhouette } from './silhouetteSprite';
-import { facadeTexture } from './facadeTextures';
+import * as Mo from './models';
+
 
 export interface SchoolNpc {
   id: string;
@@ -24,470 +26,971 @@ export interface SchoolSpot {
   action?: () => void;
 }
 
+export interface SchoolDoor {
+  id: string;
+  x: number;
+  z: number;
+  isOpen: boolean;
+}
+
 export interface SchoolBuild {
   group: THREE.Group;
-  colliders: { x: number; z: number; w: number; d: number }[];
+  colliders: { x: number; z: number; w: number; d: number; enabled?: boolean }[];
   bounds: () => { minX: number; maxX: number; minZ: number; maxZ: number };
   animate: Anim;
   npcs: SchoolNpc[];
   spots: SchoolSpot[];
+  doors: SchoolDoor[];
+  toggleDoor: (id: string) => void;
+  updateCameraOcclusion: (camera: THREE.Camera, player: THREE.Vector3) => void;
   deskAt: [number, number];
   dispose: () => void;
 }
 
-export const buildSchool = (): SchoolBuild => {
-  const root = new THREE.Group();
-  const colliders: SchoolBuild['colliders'] = [];
-  const anims: Anim[] = [];
-  const npcs: SchoolNpc[] = [];
-  const spots: SchoolSpot[] = [];
+const shelfLoader = new GLTFLoader();
+  export const buildSchool = (): SchoolBuild => {
+    Mo.resetSeed(47);
+    const root = new THREE.Group();
+    const colliders: SchoolBuild['colliders'] = [];
+    const anims: Anim[] = [];
+    const npcs: SchoolNpc[] = [];
+    const spots: SchoolSpot[] = [];
+    const doors: SchoolDoor[] = [];
+    const doorParts: { door: SchoolDoor; pivot: THREE.Group; collider: { x: number; z: number; w: number; d: number; enabled?: boolean } }[] = [];
+    const occlusionWalls: THREE.Group[] = [];
+    const occlusionTargets: THREE.Object3D[] = [];
+    const occlusionRay = new THREE.Raycaster();
 
-  const geo = {
-    box: new THREE.BoxGeometry(1, 1, 1),
-    cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
-    sphere: new THREE.SphereGeometry(0.5, 8, 6),
-    plane: new THREE.PlaneGeometry(1, 1),
-  };
+    const signMeshes: THREE.Mesh[] = [];
+    const sign = (text: string, x: number, y: number, z: number, w: number, h: number, ry: number, roomId?: string) => {
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: T.doorPlate(text), toneMapped: false, side: THREE.DoubleSide }));
+      mesh.position.set(x, y, z);
+      mesh.scale.set(w, h, 1);
+      mesh.rotation.y = ry;
+      mesh.userData.room = roomId ?? null;
+      mesh.visible = false;
+      root.add(mesh);
+      signMeshes.push(mesh);
+      return mesh;
+    };
 
-  const concrete = new THREE.MeshStandardMaterial({ map: facadeTexture('#b4aa8e', '#f6f0e5', 2), roughness: 0.9 });
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1ead9, roughness: 0.9, metalness: 0.08 });
-  const wainscot = new THREE.MeshStandardMaterial({ color: 0x5d7865, roughness: 0.78 });
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0xa58e72, roughness: 0.82 });
-  const floorCorridor = new THREE.MeshStandardMaterial({ color: 0x7a6857, roughness: 0.8 });
-  const woodMat = new THREE.MeshStandardMaterial({ color: 0x9a7346, roughness: 0.6 });
-  const woodDark = new THREE.MeshStandardMaterial({ color: 0x674a2a, roughness: 0.7 });
-  const metalMat = new THREE.MeshStandardMaterial({ color: 0x9aa2aa, roughness: 0.35, metalness: 0.6 });
-  const boardMat = new THREE.MeshStandardMaterial({ color: 0x203a2c, roughness: 0.6 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0xbcd6e8, roughness: 0.15, metalness: 0.25, transparent: true, opacity: 0.5 });
-  const plantMat = new THREE.MeshStandardMaterial({ color: 0x3f6039, roughness: 0.9 });
-  const potMat = new THREE.MeshStandardMaterial({ color: 0x7c3a31, roughness: 0.8 });
-  const toriiMat = new THREE.MeshStandardMaterial({ color: 0x992420, roughness: 0.75 });
-  const grassMat = new THREE.MeshStandardMaterial({ color: 0x486443, roughness: 0.9 });
-  const gravelMat = new THREE.MeshStandardMaterial({ color: 0x7a7974, roughness: 0.9 });
+    // Simple layout helpers using the `models` builders for consistent style
+    const put = (b: any, x: number, y: number, z: number, ry = 0, col?: [number, number]) => {
+      // Accept either a Mo.Built (has `.group`) or a raw Object3D/Mesh
+      let group: THREE.Group;
+      if (b && b.group && (b.group as THREE.Group).isGroup) {
+        group = b.group as THREE.Group;
+      } else if (b && (b as THREE.Object3D).isObject3D) {
+        group = new THREE.Group();
+        group.add(b as THREE.Object3D);
+      } else {
+        // fallback: create empty group
+        group = new THREE.Group();
+      }
+      group.position.set(x, y, z);
+      group.rotation.y = ry;
+      root.add(group);
+      if (col) colliders.push({ x, z, w: col[0], d: col[1] });
+      return b;
+    };
 
-  const box = (material: THREE.Material, x: number, y: number, z: number, sx: number, sy: number, sz: number, collide = true) => {
-    const mesh = new THREE.Mesh(geo.box, material);
-    mesh.position.set(x, y, z);
-    mesh.scale.set(sx, sy, sz);
-    mesh.receiveShadow = true;
-    root.add(mesh);
-    if (collide) colliders.push({ x, z, w: sx, d: sz });
-    return mesh;
-  };
+    // Bounds and room zones (rectangular approximations)
+    const rooms = [
+      { id: 'entrance', minX: -26, maxX: -18, minZ: -3, maxZ: 3 },
+      { id: 'library', minX: -8, maxX: 0, minZ: -18, maxZ: -6 },
+      { id: 'infirmary', minX: 2, maxX: 8, minZ: -18, maxZ: -6 },
+      { id: 'secretary', minX: -16, maxX: -10, minZ: -18, maxZ: -6 },
+      { id: 'computer', minX: -24, maxX: -18, minZ: -18, maxZ: -6 },
+      { id: 'art', minX: 10, maxX: 16, minZ: -18, maxZ: -6 },
+      { id: '2-b', minX: 17, maxX: 26, minZ: -18, maxZ: -6 },
+      { id: 'courtyard', minX: -8, maxX: 6, minZ: 0, maxZ: 6 },
+    ];
+    
+    // NPC dialogue nodes that will be referenced
+    const npcDialogues = {
+      entrance_student: 'school_entrance_student',
+      librarian_yumi: 'librarian_yumi',
+      emi_hall: 'emi_hall',
+      ken_hall: 'ken_hall',
+      hana_art: 'hana_art',
+      ryo_class: 'ryo_class',
+      nurse_reiko: 'nurse_reiko',
+      secretary_mei: 'secretary_mei',
+      computer_teacher: 'computer_teacher',
+      courtyard_keeper: 'courtyard_keeper',
+    };
+    const tiledWall = (w: number, h: number, x: number, z: number, ry = 0) => {
+      const group = new THREE.Group();
+      // A neutral ceramic finish reads more naturally under the school's mixed warm/cool light.
+      const tileMaterial = new THREE.MeshStandardMaterial({ color: 0xdedbd3, roughness: 0.62, metalness: 0.03 });
+      tileMaterial.transparent = true;
+      const face = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.16), tileMaterial);
+      face.position.y = h / 2;
+      group.add(face);
+      occlusionTargets.push(face);
 
-  const sign = (text: string, x: number, y: number, z: number, w: number, h: number, ry: number) => {
-    const mesh = new THREE.Mesh(geo.plane, new THREE.MeshBasicMaterial({ map: T.doorPlate(text), toneMapped: false }));
-    mesh.position.set(x, y, z);
-    mesh.scale.set(w, h, 1);
-    mesh.rotation.y = ry;
-    root.add(mesh);
-  };
+      // Thin grout strips turn the Pinterest stone texture into individual wall tiles.
+      const grout = new THREE.MeshStandardMaterial({ color: 0x97938c, roughness: 0.95 });
+      grout.transparent = true;
+      for (let gx = -w / 2 + 0.55; gx < w / 2; gx += 0.55) {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(0.024, h, 0.018), grout);
+        line.position.set(gx, h / 2, 0.091);
+        group.add(line);
+      }
+      for (let gy = 0.48; gy < h; gy += 0.48) {
+        const line = new THREE.Mesh(new THREE.BoxGeometry(w, 0.024, 0.018), grout);
+        line.position.set(0, gy, 0.091);
+        group.add(line);
+      }
+      const baseboardMaterial = Mo.MAT.beam.clone();
+      baseboardMaterial.transparent = true;
+      const baseboard = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.12, 0.2), baseboardMaterial);
+      baseboard.position.y = 0.06;
+      group.add(baseboard);
+      group.position.set(x, 0, z);
+      group.rotation.y = ry;
+      root.add(group);
+      occlusionWalls.push(group);
+      group.userData.fadeMaterials = [tileMaterial, grout, baseboardMaterial];
+      colliders.push(ry === 0
+        ? { x, z, w, d: 0.16 }
+        : { x, z, w: 0.16, d: w });
+    };
 
-  // ==================== 1. MAIN CORRIDOR (X: -26 to +26, Z: -5 to +5) ====================
-  // Floors
-  box(floorMat, 0, -0.05, 0, 56, 0.1, 14, false);
-  box(floorCorridor, 0, 0.01, 0, 54, 0.02, 6, false); // Center walkway
-  // Sem teto: a escola fica aberta como a casa e a rua, para manter a câmera livre.
-
-  // Outer South Wall with Lockers
-  box(concrete, 0, 2.1, 6.9, 56, 4.2, 0.24);
-  box(wainscot, 0, 0.7, 6.78, 56, 1.4, 0.06, false);
-  for (let i = 0; i < 34; i++) {
-    const x = -24 + i * 1.45;
-    const c = i % 4;
-    const lockerMat = new THREE.MeshStandardMaterial({
-      color: c === 0 ? 0x4d6a82 : c === 1 ? 0x5d6b78 : c === 2 ? 0x556350 : 0x6d5b48,
-      roughness: 0.5,
-      metalness: 0.3,
-    });
-    box(lockerMat, x, 1.05, 6.62, 1.35, 2.1, 0.45, true);
-  }
-
-  // End Walls
-  box(wallMat, -27.5, 2.1, 0, 0.24, 4.2, 14);
-  box(wallMat, 27.5, 2.1, 0, 0.24, 4.2, 14);
-
-  // Ceiling Lights in Corridor
-  for (let x = -24; x <= 24; x += 4) {
-    box(new THREE.MeshStandardMaterial({ color: 0xfff7e4, emissive: 0xffe8bd, emissiveIntensity: 1.2 }), x, 4.02, 0, 2.2, 0.08, 0.7, false);
-    const l = new THREE.PointLight(0xffe9c4, 0.4, 8, 2);
-    l.position.set(x, 3.7, 0);
-    root.add(l);
-  }
-
-  // ==================== 2. MAIN ENTRANCE & GETABAKO (X: -26 to -18) ====================
-  // Entrance Glass Doors & School Plaque
-  box(concrete, -25.5, 2.1, -2, 0.3, 4.2, 6, true);
-  sign('京都市立東山高等学校', -25.3, 2.6, 0, 1.8, 0.5, Math.PI / 2);
-  sign('HIGASHIYAMA HIGH', -25.3, 2.0, 0, 1.8, 0.3, Math.PI / 2);
-  box(glassMat, -25.3, 1.6, -1.2, 0.05, 3.2, 3.0, false);
-
-  // Getabako (Shoe lockers)
-  box(woodDark, -21.5, 0.9, 4.2, 4.5, 1.8, 0.8, true);
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 6; c++) {
-      box(new THREE.MeshStandardMaterial({ color: 0x3d2c1e }), -23.2 + c * 0.7, 0.35 + r * 0.42, 4.2, 0.6, 0.35, 0.82, false);
-    }
-  }
-
-  spots.push({
-    id: 'getabako_spot',
-    name: 'Armário de sapatos (Sabrina)',
-    type: 'EXAMINAR',
-    x: -21.5,
-    z: 3.2,
-    dialogueNodeId: 'getabako_locker_note',
-  });
-
-  // Entrance Student NPC
-  npcs.push({
-    id: 'entrance_student',
-    name: 'Aluno apressado',
-    role: 'Estudante',
-    x: -21,
-    z: 0.5,
-    dialogueNodeId: 'school_entrance_student',
-    lines: ['Bom dia! Você parece cansada.', 'Vai perder a primeira aula?', 'Corre!'],
-  });
-
-  // ==================== 3. CORRIDOR BULLETIN & CLOCK (X: -16 to -10) ====================
-  // Bulletin Board (Mural de Avisos)
-  box(new THREE.MeshStandardMaterial({ color: 0xb58b57, roughness: 0.9 }), -14, 2.1, 6.55, 3.2, 1.8, 0.08, false);
-  box(new THREE.MeshStandardMaterial({ color: 0xf5f3eb }), -14.6, 2.2, 6.5, 0.8, 1.0, 0.09, false); // Poster
-  box(new THREE.MeshStandardMaterial({ color: 0xdf8a84 }), -13.5, 2.0, 6.5, 0.9, 0.7, 0.09, false); // Flyer
-
-  spots.push({
-    id: 'bulletin_spot',
-    name: 'Mural de Avisos da Higashiyama',
-    type: 'EXAMINAR',
-    x: -14,
-    z: 5.5,
-    dialogueNodeId: 'mural_bulletin_inspect',
-  });
-
-  // Old School Photo
-  box(woodDark, -10.5, 2.2, 6.55, 1.4, 1.0, 0.08, false);
-  box(new THREE.MeshBasicMaterial({ color: 0x222222 }), -10.5, 2.2, 6.5, 1.2, 0.8, 0.09, false);
-
-  spots.push({
-    id: 'old_photo_spot',
-    name: 'Fotografia antiga da escola (1960)',
-    type: 'EXAMINAR',
-    x: -10.5,
-    z: 5.5,
-    dialogueNodeId: 'old_photo_school_inspect',
-  });
-
-  // Corridor Wall Clock (marking 10:17 AM!)
-  box(woodDark, -12, 3.2, 6.55, 0.8, 0.8, 0.1, false);
-  box(new THREE.MeshBasicMaterial({ map: T.clockDial(10, 17, 0) }), -12, 3.2, 6.49, 0.65, 0.65, 0.02, false);
-
-  // Vending Machines in Corridor
-  box(metalMat, -8, 1.2, 6.35, 1.4, 2.4, 0.8, true);
-  box(new THREE.MeshBasicMaterial({ color: 0x2d68a8 }), -8, 1.4, 5.92, 1.2, 1.4, 0.06, false);
-
-  spots.push({
-    id: 'vending_spot',
-    name: 'Máquina de bebidas',
-    type: 'EXAMINAR',
-    x: -8,
-    z: 5.2,
-    dialogueNodeId: 'vending_school_chat',
-  });
-
-  // ==================== 4. BIBLIOTECA (X: -6 to 2, Z: -12 to -6) ====================
-  // Entrance Door
-  box(woodMat, -2, 1.4, -5.9, 1.8, 2.8, 0.15, false);
-  sign('図書室 · BIBLIOTECA', -2, 3.1, -5.75, 2.2, 0.38, 0);
-
-  // Library Walls
-  box(wallMat, -6, 2.1, -9, 0.2, 4.2, 6, true);
-  box(wallMat, 2, 2.1, -9, 0.2, 4.2, 6, true);
-  box(wallMat, -2, 2.1, -12, 8.2, 4.2, 0.2, true);
-  box(floorMat, -2, -0.05, -9, 8, 0.1, 6, false);
-
-  // Bookshelves in Library
-  for (let b = 0; b < 3; b++) {
-    box(woodDark, -4.5 + b * 2.5, 1.6, -10.5, 1.8, 3.2, 0.6, true);
-  }
-  // Reading table & chairs
-  box(woodMat, -2, 0.75, -8, 3.0, 0.1, 1.2, true);
-
-  spots.push({
-    id: 'library_suspense_spot',
-    name: 'Estante: Romances Policiais & Mistério',
-    type: 'EXAMINAR',
-    x: -4.5,
-    z: -8.8,
-    dialogueNodeId: 'inspect_book_suspense',
-  });
-
-  spots.push({
-    id: 'library_parents_spot',
-    name: 'Livro de Poesia Britânica (anotação da mãe)',
-    type: 'EXAMINAR',
-    x: -2,
-    z: -8.5,
-    dialogueNodeId: 'inspect_book_parents',
-  });
-
-  npcs.push({
-    id: 'yumi_tanaka',
-    name: 'Yumi Tanaka (Bibliotecária, 51)',
-    role: 'Bibliotecária',
-    x: 0.5,
-    z: -7.5,
-    dialogueNodeId: 'librarian_yumi',
-    lines: ['Sabrina. Bom dia.', 'Você terminou aquele livro de suspense?', 'Deixei outro reservado para você.'],
-  });
-
-  // ==================== 5. ENFERMARIA (X: 3 to 9, Z: -12 to -6) ====================
-  box(woodMat, 6, 1.4, -5.9, 1.8, 2.8, 0.15, false);
-  sign('保健室 · ENFERMARIA', 6, 3.1, -5.75, 2.2, 0.38, 0);
-
-  box(wallMat, 3, 2.1, -9, 0.2, 4.2, 6, true);
-  box(wallMat, 9, 2.1, -9, 0.2, 4.2, 6, true);
-  box(wallMat, 6, 2.1, -12, 6.2, 4.2, 0.2, true);
-  box(floorMat, 6, -0.05, -9, 6, 0.1, 6, false);
-
-  // Clinic Bed & White Curtain
-  box(new THREE.MeshStandardMaterial({ color: 0xf5f5f5 }), 4.5, 0.45, -10, 1.2, 0.7, 2.2, true);
-  box(new THREE.MeshStandardMaterial({ color: 0xeeeeee, transparent: true, opacity: 0.85 }), 5.4, 1.8, -10, 0.05, 3.0, 2.4, false);
-
-  npcs.push({
-    id: 'nurse_reiko',
-    name: 'Reiko Arai (Enfermeira)',
-    role: 'Enfermeira',
-    x: 7.5,
-    z: -8.5,
-    dialogueNodeId: 'nurse_reiko',
-    lines: ['Está tudo bem, Sabrina?', 'Você parece pálida.', 'Venha deitar se a cabeça latejar.'],
-  });
-
-  // ==================== 6. SECRETARIA (X: -16 to -10, Z: -12 to -6) ====================
-  box(woodMat, -13, 1.4, -5.9, 1.8, 2.8, 0.15, false);
-  sign('事務室 · SECRETARIA', -13, 3.1, -5.75, 2.2, 0.38, 0);
-
-  npcs.push({
-    id: 'secretary_michiko',
-    name: 'Michiko Watanabe (Secretária)',
-    role: 'Secretária',
-    x: -12,
-    z: -3.5,
-    dialogueNodeId: 'secretary_michiko',
-    lines: ['Sabrina... sua avó Chiyo ligou hoje?', 'Achei ter ouvido a voz dela na linha externa.'],
-  });
-
-  // ==================== 7. LABORATÓRIO DE INFORMÁTICA (X: -24 to -18, Z: -12 to -6) ====================
-  box(woodMat, -21, 1.4, -5.9, 1.8, 2.8, 0.15, false);
-  sign('情報教室 · INFORMÁTICA', -21, 3.1, -5.75, 2.4, 0.38, 0);
-
-  // PC Terminal with Sync Error
-  box(woodDark, -19.5, 0.75, -8.5, 2.0, 0.1, 1.0, true);
-  box(metalMat, -19.5, 1.05, -8.7, 0.5, 0.4, 0.08, false);
-  box(new THREE.MeshBasicMaterial({ color: 0x0a1628 }), -19.5, 1.05, -8.65, 0.46, 0.34, 0.01, false);
-
-  spots.push({
-    id: 'pc_glitch_spot',
-    name: 'Terminal 04 (ERRO DE SINCRONIZAÇÃO)',
-    type: 'INSPECIONAR',
-    x: -19.5,
-    z: -7.5,
-    dialogueNodeId: 'pc_sync_glitch',
-  });
-
-  // ==================== 8. SALA DE ARTES & MÚSICA (X: 10 to 16, Z: -12 to -6) ====================
-  box(woodMat, 13, 1.4, -5.9, 1.8, 2.8, 0.15, false);
-  sign('美術・音楽 · ARTES & MÚSICA', 13, 3.1, -5.75, 2.8, 0.38, 0);
-
-  // Easel & Canvases in Art area
-  box(woodDark, 11.5, 1.2, -8.5, 0.8, 1.6, 0.6, true);
-  box(new THREE.MeshBasicMaterial({ color: 0xdedede }), 11.5, 1.3, -8.2, 0.7, 0.9, 0.02, false);
-
-  npcs.push({
-    id: 'art_hana',
-    name: 'Hana Fujimoto (Clube de Arte)',
-    role: 'Estudante',
-    x: 12.2,
-    z: -7.2,
-    dialogueNodeId: 'art_hana',
-    lines: ['Sabrina! Posso desenhar você?', 'Fica paradinha com essa cara séria!'],
-  });
-
-  // Piano in Music area
-  box(new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 }), 15, 0.9, -9.5, 2.2, 1.1, 1.4, true);
-
-  spots.push({
-    id: 'piano_spot',
-    name: 'Piano de cauda da sala de música',
-    type: 'EXAMINAR',
-    x: 14.8,
-    z: -8.0,
-    dialogueNodeId: 'music_room_piano',
-  });
-
-  // ==================== 9. SALA 2-B (SABRINA'S CLASSROOM) (X: 18 to 26, Z: -12 to -6) ====================
-  box(woodMat, 22, 1.4, -5.9, 1.8, 2.8, 0.15, false);
-  sign('2-B · SALA DE AULA', 22, 3.1, -5.75, 2.2, 0.38, 0);
-
-  // Classroom Shell
-  box(wallMat, 17.5, 2.1, -9, 0.2, 4.2, 6, true);
-  box(wallMat, 26.5, 2.1, -9, 0.2, 4.2, 6, true);
-  box(wallMat, 22, 2.1, -12, 9.2, 4.2, 0.2, true);
-  box(floorMat, 22, -0.05, -9, 9, 0.1, 6, false);
-
-  // Blackboard & Teacher Podium
-  box(boardMat, 22, 2.4, -11.85, 6.5, 1.8, 0.1, false);
-  box(woodDark, 22, 0.8, -10.5, 2.0, 0.1, 0.9, true);
-
-  // Student Desks in Rows
-  const deskPositions: [number, number][] = [];
-  for (let row = 0; row < 3; row++) {
-    for (let col = 0; col < 3; col++) {
-      const dx = 19.5 + col * 2.4;
-      const dz = -9.8 + row * 1.5;
-      deskPositions.push([dx, dz]);
-      box(woodMat, dx, 0.74, dz, 1.1, 0.08, 0.65, true);
-      box(metalMat, dx - 0.4, 0.37, dz - 0.22, 0.06, 0.72, 0.06, false);
-      box(metalMat, dx + 0.4, 0.37, dz - 0.22, 0.06, 0.72, 0.06, false);
-    }
-  }
-
-  // Sabrina's Desk (front row, next to window!)
-  const deskAt: [number, number] = [deskPositions[0][0], deskPositions[0][1] + 0.8];
-  sign('SHINOHARA', deskPositions[0][0], 0.82, deskPositions[0][1] - 0.34, 0.62, 0.16, Math.PI);
-
-  // Floor target ring on Sabrina's seat
-  const seatRing = new THREE.Mesh(
-    new THREE.RingGeometry(0.35, 0.5, 28),
-    new THREE.MeshBasicMaterial({ color: 0x4f9be8, transparent: true, opacity: 0.85 }),
-  );
-  seatRing.rotation.x = -Math.PI / 2;
-  seatRing.position.set(deskAt[0], 0.03, deskAt[1]);
-  root.add(seatRing);
-  anims.push((t) => {
-    const s = 1 + Math.sin(t * 2.8) * 0.1;
-    seatRing.scale.set(s, s, 1);
-  });
-
-  spots.push({
-    id: 'sabrina_desk_seat',
-    name: 'Sua carteira (2-B)',
-    type: 'EXAMINAR',
-    x: deskAt[0],
-    z: deskAt[1],
-  });
-
-  // Classmates in 2-B
-  npcs.push({
-    id: 'emi_classmate',
-    name: 'Emi Takahashi',
-    role: 'Colega de classe',
-    x: deskPositions[1][0],
-    z: deskPositions[1][1] + 0.9,
-    dialogueNodeId: 'emi_corridor_chat',
-    lines: ['Você viu que a prova de Química mudou?', 'Trinta por cento da nota!'],
-  });
-
-  npcs.push({
-    id: 'ken_classmate',
-    name: 'Ken',
-    role: 'Colega de classe',
-    x: deskPositions[3][0],
-    z: deskPositions[3][1] + 0.9,
-    dialogueNodeId: 'ken_talk',
-    lines: ['Sabrina, posso copiar a quatro de matemática?'],
-  });
-
-  npcs.push({
-    id: 'mika_classmate',
-    name: 'Mika',
-    role: 'Colega estudiosa',
-    x: deskPositions[5][0],
-    z: deskPositions[5][1] + 0.9,
-    dialogueNodeId: 'mika_talk',
-    lines: ['Sabrina, você estudou para a revisão de Química?'],
-  });
-
-  npcs.push({
-    id: 'ryo_classmate',
-    name: 'Ryo',
-    role: 'Colega brincalhão',
-    x: deskPositions[7][0],
-    z: deskPositions[7][1] + 0.9,
-    dialogueNodeId: 'ryo_talk',
-    lines: ['Sabrina, você está viva? ...Foi uma piada?'],
-  });
-
-  // ==================== 10. PÁTIO INTERNO, SANTUÁRIO & QUADRA (Z: 0 to 6) ====================
-  // Sports Court / Field (X: 18 to 25, Z: 1 to 5)
-  npcs.push({
-    id: 'daichi_soccer',
-    name: 'Daichi Mori (Futebol)',
-    role: 'Clube de Futebol',
-    x: 23,
-    z: 2.5,
-    dialogueNodeId: 'soccer_daichi',
-    lines: ['Sabrina! Você vai assistir ao nosso jogo na sexta?'],
-  });
-
-  // School Shinto Shrine in Courtyard (X: -14 to -8, Z: 0 to 4)
-  box(gravelMat, -5, 0.01, 3.5, 4.0, 0.02, 3.5, false);
-  // Torii Gate
-  box(toriiMat, -6.2, 1.4, 2.5, 0.22, 2.8, 0.22, true);
-  box(toriiMat, -3.8, 1.4, 2.5, 0.22, 2.8, 0.22, true);
-  box(toriiMat, -5.0, 2.8, 2.5, 3.2, 0.26, 0.3, false);
-  // Small Shinto Shrine Structure
-  box(woodDark, -5.0, 1.2, 4.4, 1.8, 1.6, 1.4, true);
-  box(new THREE.MeshStandardMaterial({ color: 0x33251c }), -5.0, 2.1, 4.4, 2.4, 0.25, 1.8, false);
-
-  spots.push({
-    id: 'shrine_school_spot',
-    name: 'Pequeno santuário xintoísta escolar',
-    type: 'EXAMINAR',
-    x: -5.0,
-    z: 2.8,
-    dialogueNodeId: 'shrine_school_talk',
-  });
-
-  // Sprite animation loop
-  const npcSprites: { sprite: THREE.Sprite; x: number; z: number; phase: number }[] = [];
-  npcs.forEach((npc, idx) => {
-    const sprite = createSilhouette(false, 1.58);
-    sprite.position.set(npc.x, 0, npc.z);
-    root.add(sprite);
-    npcSprites.push({ sprite, x: npc.x, z: npc.z, phase: idx * 1.1 });
-    colliders.push({ x: npc.x, z: npc.z, w: 0.6, d: 0.6 });
-  });
-
-  anims.push((t) => {
-    npcSprites.forEach((ns) => {
-      ns.sprite.position.y = Math.abs(Math.sin(t * 2.2 + ns.phase)) * 0.03;
-    });
-  });
-
-  const bounds = () => ({ minX: -26.5, maxX: 26.5, minZ: -12.2, maxZ: 6.2 });
-  const animate: Anim = (t, dt) => anims.forEach((a) => a(t, dt));
-
-  return {
-    group: root,
-    colliders,
-    npcs,
-    spots,
-    deskAt,
-    bounds,
-    animate,
-    dispose: () => {
-      const sharedGeos = Object.values(geo) as THREE.BufferGeometry[];
-      root.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (mesh.isMesh && mesh.geometry && !sharedGeos.includes(mesh.geometry)) {
-          mesh.geometry.dispose();
-        }
+    const box = (g: THREE.Group, w: number, h: number, d: number, material: THREE.Material, x: number, y: number, z: number) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+      mesh.position.set(x, y, z);
+      g.add(mesh);
+      return mesh;
+    };
+    const schoolDesk = () => {
+      const g = new THREE.Group();
+      box(g, 1.18, 0.09, 0.68, Mo.MAT.oak, 0, 0.74, 0);
+      [[-0.48, -0.25], [-0.48, 0.25], [0.48, -0.25], [0.48, 0.25]].forEach(([x, z]) => box(g, 0.06, 0.72, 0.06, Mo.MAT.iron, x, 0.36, z));
+      box(g, 0.52, 0.07, 0.48, Mo.MAT.darkWood, 0, 0.4, 0.68);
+      box(g, 0.52, 0.42, 0.06, Mo.MAT.darkWood, 0, 0.64, 0.9);
+      [[-0.2, 0.52], [0.2, 0.52], [-0.2, 0.84], [0.2, 0.84]].forEach(([x, z]) => box(g, 0.045, 0.48, 0.045, Mo.MAT.iron, x, 0.24, z));
+      return { group: g };
+    };
+    const readingTable = () => {
+      const g = new THREE.Group();
+      box(g, 1.55, 0.08, 0.92, Mo.MAT.oak, 0, 0.74, 0);
+      [[-0.62, -0.32], [-0.62, 0.32], [0.62, -0.32], [0.62, 0.32]].forEach(([x, z]) => box(g, 0.08, 0.72, 0.08, Mo.MAT.darkWood, x, 0.36, z));
+      box(g, 0.42, 0.035, 0.28, Mo.MAT.paper, -0.25, 0.8, 0.02);
+      box(g, 0.36, 0.05, 0.25, Mo.std(0x653f33, 0.7), 0.3, 0.81, -0.1);
+      return { group: g };
+    };
+    const lockers = (count: number) => {
+      const g = new THREE.Group();
+      const metal = Mo.std(0x60758a, 0.45, 0.55);
+      for (let i = 0; i < count; i++) {
+        const x = (i - (count - 1) / 2) * 0.72;
+        box(g, 0.66, 1.85, 0.42, metal, x, 0.93, 0);
+        box(g, 0.04, 0.55, 0.025, Mo.MAT.brass, x + 0.2, 1.08, 0.225);
+        for (let s = 0; s < 3; s++) box(g, 0.2, 0.018, 0.025, Mo.MAT.iron, x, 1.46 + s * 0.1, 0.225);
+      }
+      return { group: g };
+    };
+    const bench = () => {
+      const g = new THREE.Group();
+      box(g, 2.1, 0.09, 0.52, Mo.MAT.oak, 0, 0.5, 0);
+      box(g, 2.1, 0.48, 0.07, Mo.MAT.oak, 0, 0.92, -0.2);
+      [-0.82, 0.82].forEach((x) => box(g, 0.07, 0.5, 0.07, Mo.MAT.iron, x, 0.25, 0));
+      return { group: g };
+    };
+    const bin = () => {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.42, 14), Mo.MAT.steel);
+      body.position.y = 0.21;
+      g.add(body);
+      const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.035, 14), Mo.MAT.iron);
+      lid.position.y = 0.43;
+      g.add(lid);
+      return { group: g };
+    };
+    const ceilingLight = (x: number, z: number) => {
+      const fixture = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.38), new THREE.MeshStandardMaterial({ color: 0xfff9de, emissive: 0xffe6ac, emissiveIntensity: 1.4 }));
+      fixture.position.set(x, 3.85, z);
+      root.add(fixture);
+      const light = new THREE.PointLight(0xffedc4, 0.48, 8, 2);
+      light.position.set(x, 3.55, z);
+      root.add(light);
+    };
+    const pendantLamp = (x: number, z: number) => {
+      const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 1.25, 8), Mo.MAT.iron);
+      cable.position.set(x, 3.38, z);
+      root.add(cable);
+      // Darker, more atmospheric shade
+      const shade = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.22, 20, 1, true), new THREE.MeshStandardMaterial({ 
+        color: 0x3a2518, 
+        roughness: 0.6, 
+        metalness: 0.3, 
+        side: THREE.DoubleSide 
+      }));
+      shade.position.set(x, 2.68, z);
+      shade.rotation.x = Math.PI;
+      root.add(shade);
+      // Warmer, more visible bulb
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 10), new THREE.MeshStandardMaterial({ 
+        color: 0xffe0a0, 
+        emissive: 0xffa040, 
+        emissiveIntensity: 2.5, 
+        roughness: 0.2 
+      }));
+      bulb.position.set(x, 2.58, z);
+      root.add(bulb);
+      // Brighter light with shadows for atmospheric effect
+      const light = new THREE.PointLight(0xffb060, 1.8, 9, 2.2);
+      light.position.set(x, 2.55, z);
+      light.castShadow = true;
+      light.shadow.mapSize.set(512, 512);
+      light.shadow.bias = -0.003;
+      light.shadow.radius = 4;
+      root.add(light);
+    };
+    const poster = (x: number, z: number, text: string) => {
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 0.72), new THREE.MeshBasicMaterial({ map: T.doorPlate(text), side: THREE.DoubleSide, toneMapped: false }));
+      mesh.position.set(x, 2.05, z);
+      root.add(mesh);
+    };
+    const rainyWindow = (x: number, z: number, ry = 0, w = 1.7) => {
+      const g = new THREE.Group();
+      const frame = Mo.MAT.beam;
+      const pane = new THREE.MeshStandardMaterial({ color: 0x9eafbd, emissive: 0x657785, emissiveIntensity: 0.45, transparent: true, opacity: 0.7, roughness: 0.18 });
+      box(g, w, 1.6, 0.1, pane, 0, 2.25, 0);
+      box(g, w + 0.12, 0.09, 0.14, frame, 0, 1.43, 0);
+      box(g, w + 0.12, 0.09, 0.14, frame, 0, 3.07, 0);
+      [-w / 2, 0, w / 2].forEach((ox) => box(g, 0.08, 1.7, 0.14, frame, ox, 2.25, 0));
+      g.position.set(x, 0, z);
+      g.rotation.y = ry;
+      root.add(g);
+      const daylight = new THREE.PointLight(0xb7c8dc, 0.42, 5, 2);
+      daylight.position.set(x, 2.2, z + (ry === 0 ? 0.45 : 0));
+      root.add(daylight);
+    };
+    const cabinet = (w = 1.5, h = 1.25) => {
+      const g = new THREE.Group();
+      box(g, w, h, 0.44, Mo.MAT.oak, 0, h / 2, 0);
+      [-w * 0.24, w * 0.24].forEach((x) => {
+        box(g, 0.025, h - 0.12, 0.02, Mo.MAT.beam, x, h / 2, 0.23);
+        box(g, 0.05, 0.05, 0.04, Mo.MAT.brass, x + (x < 0 ? 0.12 : -0.12), h * 0.48, 0.25);
       });
-      [concrete, wallMat, wainscot, floorMat, floorCorridor, woodMat, woodDark, metalMat, boardMat, glassMat, plantMat, potMat, toriiMat, grassMat, gravelMat].forEach((m) => m.dispose());
-      sharedGeos.forEach((g) => g.dispose());
-      root.removeFromParent();
-    },
+      return { group: g };
+    };
+    const noticeBoard = (w = 1.5) => {
+      const g = new THREE.Group();
+      box(g, w + 0.12, 1.25, 0.08, Mo.MAT.oak, 0, 0.63, 0);
+      box(g, w, 1.1, 0.025, Mo.std(0xb69062, 0.95), 0, 0.63, 0.06);
+      [-0.3, 0, 0.3].forEach((x, i) => box(g, 0.22, 0.3, 0.012, Mo.std([0xe8d9b5, 0xc87f72, 0x9bb6cc][i], 0.9), x, 0.72 + (i % 2) * 0.12, 0.082));
+      return { group: g };
+    };
+
+    // Helper to add a front partition with a door for a room.
+    const addFrontPartition = (centerX: number, roomW: number, z: number, roomId: string, doorW = 1.0, wallH = 3.2) => {
+      const leftW = (roomW - doorW) / 2;
+      const rightW = leftW;
+      const leftX = centerX - (doorW / 2 + leftW / 2);
+      const rightX = centerX + (doorW / 2 + rightW / 2);
+      if (leftW > 0.1) tiledWall(leftW, wallH, leftX, z);
+      if (rightW > 0.1) tiledWall(rightW, wallH, rightX, z);
+      // lintel above the opening
+      put(Mo.lintel(doorW + 0.16), centerX, 2.1, z);
+      // The leaf rotates around its left hinge; the frame remains in the wall.
+      const pivot = new THREE.Group();
+      pivot.position.set(centerX - doorW / 2, 0, z);
+      const leaf = Mo.doorClosed(doorW, 2.1, roomId).group;
+      leaf.position.x = doorW / 2;
+      pivot.add(leaf);
+      root.add(pivot);
+      const collider = { x: centerX, z, w: doorW, d: 0.22, enabled: true };
+      const door: SchoolDoor = { id: `door_${roomId}`, x: centerX, z, isOpen: false };
+      colliders.push(collider);
+      doors.push(door);
+      doorParts.push({ door, pivot, collider });
+    };
+
+    // Corridor floor and a few structural elements
+    put(Mo.woodFloor(56, 25), 0, 0, -5.5);
+    put(Mo.box(56, 0.1, 25, Mo.std(0x666666)), 0, -0.05, -5.5);
+
+    // Generate interior partitions + doors for all named rooms (skip entrance/courtyard)
+    for (const r of rooms) {
+      if (r.id === 'entrance' || r.id === 'courtyard') continue;
+      const roomW = r.maxX - r.minX;
+      const cx = (r.minX + r.maxX) / 2;
+      const frontZ = r.maxZ; // front face adjacent to corridor
+      addFrontPartition(cx, roomW, frontZ, r.id, 1.0, 3.2);
+    }
+
+    // Tiled, solid perimeter walls.
+    tiledWall(56, 4.2, 0, -18.2);
+    tiledWall(56, 4.2, 0, 6.2);
+    tiledWall(24.4, 4.2, -27, -6, Math.PI / 2);
+    tiledWall(24.4, 4.2, 27, -6, Math.PI / 2);
+
+    // Entrance - Enhanced with more details
+    // A double glass portal set into the west facade marks this as the school entrance.
+    const entrance = new THREE.Group();
+    const glass = new THREE.MeshStandardMaterial({ color: 0xb8d9e8, metalness: 0.15, roughness: 0.18, transparent: true, opacity: 0.72 });
+    [-0.64, 0.64].forEach((z) => {
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.35, 1.15), glass);
+      leaf.position.set(0, 1.18, z);
+      entrance.add(leaf);
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.05, 0.05), Mo.MAT.brass);
+      handle.position.set(-0.08, 1.12, z + (z < 0 ? 0.3 : -0.3));
+      entrance.add(handle);
+    });
+    [[0, 2.42, 0, 0.18, 0.14, 2.65], [0, 0.06, 0, 0.18, 0.12, 2.65], [0, 1.2, -1.3, 0.18, 2.4, 0.12], [0, 1.2, 1.3, 0.18, 2.4, 0.12]].forEach(([x, y, z, w, h, d]) => {
+      const part = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), Mo.MAT.beam);
+      part.position.set(x, y, z);
+      entrance.add(part);
+    });
+    entrance.position.set(-26.88, 0, -1.35);
+    root.add(entrance);
+    sign('京都市立東山高等学校', -25.3, 2.6, 0, 1.8, 0.5, Math.PI / 2, 'entrance');
+    sign('HIGASHIYAMA HIGH', -25.3, 2.0, 0, 1.8, 0.3, Math.PI / 2, 'entrance');
+
+    // Entrance area furniture and details
+    // Shoe rack near entrance
+    put(Mo.rack(2.5), -22.5, 0, -1.5, 0, [2.5, 1.2]);
+    // Welcome mat
+    put(Mo.doormat(), -24, 0, 0.5, 0, [1.2, 0.7]);
+    // Information board
+    put(noticeBoard(1.5), -23, 1.15, -1.5, Math.PI, [1.5, 0.12]);
+    // Umbrella stand with umbrellas
+    put(Mo.umbrellaStand(), -24.5, 0, 1.2, 0, [0.5, 0.5]);
+    // Potted plant
+    put(Mo.plant('bamboo_large'), -22, 0, 1.8, 0, [0.6, 0.6]);
+    
+    // Spots for entrance
+    spots.push({
+      id: 'entrance_shoe_rack',
+      name: 'Aparelho de sapatos',
+      type: 'EXAMINAR',
+      x: -22.5,
+      z: -1.5,
+      dialogueNodeId: 'entrance_shoe_rack'
+    });
+    spots.push({
+      id: 'entrance_info_board',
+      name: 'Cartaz informativo',
+      type: 'EXAMINAR',
+      x: -23,
+      z: -1.5,
+      dialogueNodeId: 'entrance_info_board'
+    });
+    spots.push({
+      id: 'entrance_umbrella',
+      name: 'Porte- guarda-chuvas',
+      type: 'EXAMINAR',
+      x: -24.5,
+      z: 1.2,
+      dialogueNodeId: 'entrance_umbrella'
+    });
+
+    // Secretary room furniture
+    put(Mo.desk(), -13.5, 0, -15.5, Math.PI, [2.2, 1]);
+    put(Mo.chair('leather'), -13.5, 0, -14.15, Math.PI, [0.6, 0.6]);
+    put(cabinet(1.5), -13.8, 0, -16.8, 0, [1.5, 0.55]);
+    put(Mo.telephone(), -12.8, 0, -15.5, 0, [0.4, 0.4]);
+    put(Mo.fileCabinet(2.2), -15.5, 0, -15.8, 0, [1.2, 0.55]);
+    put(Mo.plant('monstera'), -11.5, 0, -16.2, 0, [0.5, 0.5]);
+    put(noticeBoard(1.2), -14.5, 1.1, -16.5, 0, [1.2, 0.12]);
+    
+    // Computer room furniture - organized in blocks
+    // Block 1: Computer desks row (back wall)
+    put(Mo.computerDesk(1.4), -21, 0, -15.5, 0, [1.4, 0.8]);
+    put(Mo.computerDesk(1.4), -22.5, 0, -15.5, 0, [1.4, 0.8]);
+    put(Mo.computerDesk(1.4), -24, 0, -15.5, 0, [1.4, 0.8]);
+    
+    // Block 2: Chairs in front of each desk
+    put(Mo.chair('leather'), -21, 0, -14.5, 0, [0.6, 0.6]);
+    put(Mo.chair('leather'), -22.5, 0, -14.5, 0, [0.6, 0.6]);
+    put(Mo.chair('leather'), -24, 0, -14.5, 0, [0.6, 0.6]);
+    
+    // Block 3: Printer station (side)
+    put(Mo.printer(), -19.05, 0, -16.3, Math.PI / 2, [0.8, 0.5]);
+    
+    // Block 4: Storage and teaching tools
+    put(cabinet(1.2), -25.5, 0, -15.8, Math.PI / 2, [1.2, 0.5]);
+    put(Mo.whiteboard(), -25, 1.2, -13, Math.PI, [1.8, 0.08]);
+    put(noticeBoard(1.0), -22, 1.15, -12.5, 0, [1.0, 0.12]);
+    
+    // Art room furniture - organized in blocks
+    // Block 1: Easels area (left side)
+    put(Mo.easel(), 12.5, 0, -15.5, 0, [0.5, 0.5]);
+    put(Mo.easel(), 14.5, 0, -15.5, Math.PI / 2, [0.5, 0.5]);
+    
+    // Block 2: Display area (center, on wall)
+    put(Mo.paintingDisplay(), 13.5, 1.15, -14.8, Math.PI, [1.2, 0.12]);
+    
+    // Block 3: Storage cabinets (right side)
+    put(cabinet(1.5), 15.5, 0, -14.5, Math.PI / 2, [1.5, 0.55]);
+    put(Mo.artSuppliesCabinet(), 15, 0, -15.8, 0, [1.2, 0.55]);
+    put(Mo.sculptureDisplay(), 14.5, 0, -13.5, 0, [0.5, 0.5]);
+    
+    // Block 4: Lighting and utility
+    put(Mo.lightFixture(), 13, 2.8, -13.5, 0, [0.5, 0.5]);
+    put(Mo.sinkUnit(), 11.5, 0, -14.5, 0, [1.0, 0.8]);
+    put(noticeBoard(1.2), 12, 1.2, -12.5, Math.PI, [1.2, 0.12]);
+    
+    // Infirmary furniture
+    put(Mo.examinationTable(), 4.5, 0, -15.2, 0, [1.2, 0.8]);
+    put(Mo.medicalCabinet(), 6.2, 0, -14.8, Math.PI / 2, [0.8, 0.5]);
+    put(Mo.bed(), 3.2, 0, -16.2, 0, [1.8, 2.2]);
+    put(Mo.firstAidKit(), 5.5, 0, -16.5, 0, [0.4, 0.4]);
+    put(Mo.stool(), 5.2, 0, -14.8, 0, [0.35, 0.35]);
+    put(cabinet(1.8), 7.5, 0, -15.5, Math.PI / 2, [1.8, 0.55]);
+    put(Mo.sinkUnit(), 7, 0, -16.5, Math.PI / 2, [1.0, 0.8]);
+    put(noticeBoard(1.0), 5, 1.15, -17, 0, [1.0, 0.12]);
+    put(Mo.plant('cactus'), 2.5, 0, -14.5, 0, [0.3, 0.3]);
+
+    // Courtyard spots
+    spots.push({
+      id: 'courtyard_shrine',
+      name: 'Santuário do Jardim',
+      type: 'EXAMINAR',
+      x: -5,
+      z: 3.2,
+      dialogueNodeId: 'courtyard_shrine'
+    });
+    spots.push({
+      id: 'courtyard_tree',
+      name: 'Árvore Antiga',
+      type: 'EXAMINAR',
+      x: -5,
+      z: 4.5,
+      dialogueNodeId: 'courtyard_tree'
+    });
+    spots.push({
+      id: 'courtyard_stone',
+      name: 'Pedra Sagrada',
+      type: 'EXAMINAR',
+      x: -4.2,
+      z: 3.8,
+      dialogueNodeId: 'courtyard_stone'
+    });
+
+    // Corridor spots - additional notice boards and details
+    spots.push({
+      id: 'corridor_notices_main',
+      name: 'Painel de Avisos Principal',
+      type: 'EXAMINAR',
+      x: 0,
+      z: 5.8,
+      dialogueNodeId: 'corridor_notices_main'
+    });
+    spots.push({
+      id: 'corridor_trophy_case',
+      name: 'Casa de Troféus',
+      type: 'EXAMINAR',
+      x: -10,
+      z: 5.5,
+      dialogueNodeId: 'corridor_trophy_case'
+    });
+    spots.push({
+      id: 'corridor_fire_extinguisher',
+      name: 'Extintor de Incêndio',
+      type: 'EXAMINAR',
+      x: 6,
+      z: 5.2,
+      dialogueNodeId: 'corridor_fire_extinguisher'
+    });
+    spots.push({
+      id: 'corridor_clock',
+      name: 'Relógio do Corredor',
+      type: 'EXAMINAR',
+      x: 12,
+      z: 5.3,
+      dialogueNodeId: 'corridor_clock'
+    });
+
+    // Secretary room spots
+    spots.push({
+      id: 'secretary_desk',
+      name: 'Escrivaninha da Secretária',
+      type: 'EXAMINAR',
+      x: -13.5,
+      z: -15.2,
+      dialogueNodeId: 'secretary_desk'
+    });
+    spots.push({
+      id: 'secretary_filing_cabinet',
+      name: 'Arquivo de Documentos',
+      type: 'EXAMINAR',
+      x: -13.8,
+      z: -16.8,
+      dialogueNodeId: 'secretary_filing_cabinet'
+    });
+    spots.push({
+      id: 'secretary_phone',
+      name: 'Telefone da Secretária',
+      type: 'EXAMINAR',
+      x: -12.8,
+      z: -15.5,
+      dialogueNodeId: 'secretary_phone'
+    });
+
+    // Computer room spots
+    spots.push({
+      id: 'computer_lab_main_pc',
+      name: 'Computador Principal',
+      type: 'EXAMINAR',
+      x: -21,
+      z: -15.2,
+      dialogueNodeId: 'computer_lab_main_pc'
+    });
+    spots.push({
+      id: 'computer_lab_printer',
+      name: 'Impressora',
+      type: 'EXAMINAR',
+      x: -22.5,
+      z: -14.5,
+      dialogueNodeId: 'computer_lab_printer'
+    });
+    spots.push({
+      id: 'computer_lab_server',
+      name: 'Servidor do Laboratório',
+      type: 'EXAMINAR',
+      x: -23.5,
+      z: -15.5,
+      dialogueNodeId: 'computer_lab_server'
+    });
+
+    // Art room spots
+    spots.push({
+      id: 'art_room_paintings',
+      name: 'Quadros em Exibição',
+      type: 'EXAMINAR',
+      x: 13.5,
+      z: -14.8,
+      dialogueNodeId: 'art_room_paintings'
+    });
+    spots.push({
+      id: 'art_room_sculpture',
+      name: 'Escultura',
+      type: 'EXAMINAR',
+      x: 14.5,
+      z: -13.5,
+      dialogueNodeId: 'art_room_sculpture'
+    });
+    spots.push({
+      id: 'art_room_easel',
+      name: 'Tela de Pintura',
+      type: 'EXAMINAR',
+      x: 12.5,
+      z: -15.5,
+      dialogueNodeId: 'art_room_easel'
+    });
+    spots.push({
+      id: 'art_room_supplies',
+      name: 'Kit de Tintas',
+      type: 'EXAMINAR',
+      x: 15.2,
+      z: -14.5,
+      dialogueNodeId: 'art_room_supplies'
+    });
+
+    // Classroom 2-B spots - additional
+    spots.push({
+      id: 'classroom_blackboard',
+      name: 'Quadro Negro',
+      type: 'EXAMINAR',
+      x: 21,
+      z: -8.5,
+      dialogueNodeId: 'classroom_blackboard'
+    });
+    spots.push({
+      id: 'classroom Teacher_desk',
+      name: 'Mesa do Professor',
+      type: 'EXAMINAR',
+      x: 24,
+      z: -8.8,
+      dialogueNodeId: 'classroom_teacher_desk'
+    });
+    spots.push({
+      id: 'classroom_class_board',
+      name: 'Painel de Aulas',
+      type: 'EXAMINAR',
+      x: 23,
+      z: -11,
+      dialogueNodeId: 'classroom_class_board'
+    });
+    spots.push({
+      id: 'classroom_storage_closet',
+      name: 'Armário de Materiais',
+      type: 'EXAMINAR',
+      x: 26.5,
+      z: -10,
+      dialogueNodeId: 'classroom_storage_closet'
+    });
+
+    // Infirmary spots
+    spots.push({
+      id: 'infirmary_examination_table',
+      name: 'Mesa de Exame',
+      type: 'EXAMINAR',
+      x: 4.5,
+      z: -15.2,
+      dialogueNodeId: 'infirmary_examination_table'
+    });
+    spots.push({
+      id: 'infirmary_medical_cabinet',
+      name: 'Cofre Médico',
+      type: 'EXAMINAR',
+      x: 6.2,
+      z: -14.8,
+      dialogueNodeId: 'infirmary_medical_cabinet'
+    });
+    spots.push({
+      id: 'infirmary_rest_bed',
+      name: 'Leito de Repouso',
+      type: 'EXAMINAR',
+      x: 3.2,
+      z: -16.2,
+      dialogueNodeId: 'infirmary_rest_bed'
+    });
+    spots.push({
+      id: 'infirmary_first_aid_kit',
+      name: 'Kits de Primeiros Socorros',
+      type: 'EXAMINAR',
+      x: 5.5,
+      z: -16.5,
+      dialogueNodeId: 'infirmary_first_aid_kit'
+    });
+
+    // Library - additional spots already added in previous edits
+
+    // Library
+    tiledWall(8.2, 4.2, -2, -18);
+    tiledWall(12, 4.2, -8, -12, Math.PI / 2);
+    tiledWall(12, 4.2, 0, -12, Math.PI / 2);
+    sign('図書室 · BIBLIOTECA', -2, 3.1, -5.75, 2.2, 0.38, 0, 'library');
+
+    // Infirmary
+    tiledWall(6.2, 4.2, 5, -18);
+    tiledWall(12, 4.2, 2, -12, Math.PI / 2);
+    tiledWall(12, 4.2, 8, -12, Math.PI / 2);
+    sign('保健室 · ENFERMARIA', 6, 3.1, -5.75, 2.2, 0.38, 0, 'infirmary');
+
+    // Secretary
+    tiledWall(6.2, 4.2, -13, -18);
+    tiledWall(12, 4.2, -16, -12, Math.PI / 2);
+    tiledWall(12, 4.2, -10, -12, Math.PI / 2);
+    sign('事務室 · SECRETARIA', -13, 3.1, -5.75, 2.2, 0.38, 0, 'secretary');
+
+    // Computer room
+    tiledWall(6.2, 4.2, -21, -18);
+    tiledWall(12, 4.2, -24, -12, Math.PI / 2);
+    tiledWall(12, 4.2, -18, -12, Math.PI / 2);
+    sign('情報教室 · INFORMÁTICA', -21, 3.1, -5.75, 2.4, 0.38, 0, 'computer');
+
+    // Art & Music
+    tiledWall(6.2, 4.2, 13, -18);
+    tiledWall(12, 4.2, 10, -12, Math.PI / 2);
+    tiledWall(12, 4.2, 16, -12, Math.PI / 2);
+    sign('美術・音楽 · ARTES & MÚSICA', 13, 3.1, -5.75, 2.8, 0.38, 0, 'art');
+
+    // Classroom 2-B with desks
+    tiledWall(9.2, 4.2, 21.5, -18);
+    tiledWall(12, 4.2, 17, -12, Math.PI / 2);
+    tiledWall(12, 4.2, 26, -12, Math.PI / 2);
+    sign('2-B · SALA DE AULA', 22, 3.1, -5.75, 2.2, 0.38, 0, '2-b');
+
+    // Lived-in school details: lockers, benches, bins, notices and warm ceiling lighting.
+    put(lockers(8), -20.5, 0, 5.5, 0, [5.8, 0.55]);
+    put(lockers(10), 11.5, 0, 5.5, 0, [7.2, 0.55]);
+    put(bench(), -10.5, 0, 4.75, Math.PI, [2.1, 0.6]);
+    put(bench(), 2.5, 0, 4.75, Math.PI, [2.1, 0.6]);
+    put(bin(), -7.2, 0, 5.25, 0, [0.4, 0.4]);
+    put(bin(), 7.5, 0, 5.25, 0, [0.4, 0.4]);
+    poster(-14, 6.07, 'CLUBE DE ARTES');
+    poster(-9, 6.07, 'FESTIVAL ESCOLAR');
+    poster(5, 6.07, 'REGRAS DO CORREDOR');
+    poster(15, 6.07, 'BEM-VINDOS');
+    for (let x = -23; x <= 25; x += 5) ceilingLight(x, 1.3);
+    [-13, -3, 5, 13, 21].forEach((x) => ceilingLight(x, -10));
+
+    // Library: spacious layout with larger shelves, proper furniture spacing, and atmospheric lighting
+    // Organized to prevent chair-table collisions and create a cozy study atmosphere
+    
+    // Larger bookshelves along the walls (scaled up from original)
+    const libraryShelves = [
+      { x: -7.72, z: -7.5, ry: Math.PI / 2, name: 'Mistérios e romances policiais', dialogueNodeId: 'library_shelf_mystery', scale: 1.4 },
+      { x: -7.72, z: -10.2, ry: Math.PI / 2, name: 'Poesia japonesa', dialogueNodeId: 'library_shelf_poetry', scale: 1.4 },
+      { x: -7.72, z: -12.9, ry: Math.PI / 2, name: 'Astronomia e espaço', dialogueNodeId: 'library_shelf_astronomy', scale: 1.4 },
+      { x: -7.72, z: -15.6, ry: Math.PI / 2, name: 'História de Kyoto', dialogueNodeId: 'library_shelf_history', scale: 1.4 },
+      { x: -0.28, z: -7.5, ry: -Math.PI / 2, name: 'Ciências naturais', dialogueNodeId: 'library_shelf_science', scale: 1.4 },
+      { x: -0.28, z: -10.2, ry: -Math.PI / 2, name: 'Filosofia', dialogueNodeId: 'library_shelf_philosophy', scale: 1.4 },
+      { x: -0.28, z: -12.9, ry: -Math.PI / 2, name: 'Literatura estrangeira', dialogueNodeId: 'library_shelf_foreign', scale: 1.4 },
+      { x: -0.28, z: -15.6, ry: -Math.PI / 2, name: 'Arquivo escolar', dialogueNodeId: 'library_shelf_archive', scale: 1.4 },
+    ];
+    libraryShelves.forEach((shelf) => {
+      colliders.push({ x: shelf.x, z: shelf.z, w: 0.7, d: 1.4 });
+      spots.push({ id: `library_${shelf.dialogueNodeId}`, name: shelf.name, type: 'EXAMINAR', x: shelf.x + (shelf.x < -4 ? 0.85 : -0.85), z: shelf.z, dialogueNodeId: shelf.dialogueNodeId });
+    });
+    shelfLoader.load('/models/polyhaven/shelf/Shelf_01_1k.gltf', (asset) => {
+      libraryShelves.forEach((slot) => {
+        const shelf = asset.scene.clone(true);
+        shelf.position.set(slot.x, 0, slot.z);
+        shelf.rotation.y = slot.ry;
+        shelf.scale.setScalar(slot.scale);
+        root.add(shelf);
+      });
+    });
+
+    // Reading tables in a strict two-by-two grid; chairs sit in the clear aisles.
+    // Table 1: Left side
+    put(readingTable(), -5.1, 0, -11.6, 0, [1.6, 1]);
+    // Table 2: Right side  
+    put(readingTable(), -2.7, 0, -11.6, 0, [1.6, 1]);
+    // Table 3: Back left
+    put(readingTable(), -5.1, 0, -14.7, 0, [1.6, 1]);
+    // Table 4: Back right
+    put(readingTable(), -2.7, 0, -14.7, 0, [1.6, 1]);
+
+    [[-6.25, -11.6], [-4.0, -11.6], [-3.8, -11.6], [-1.55, -11.6], [-6.25, -14.7], [-4.0, -14.7], [-3.8, -14.7], [-1.55, -14.7]]
+      .forEach(([x, z]) => put(Mo.chair('wood'), x, 0, z, Math.PI / 2, [0.55, 0.55]));
+
+    // Armchairs in the front area (near the entrance)
+    put(Mo.armchair(), -5.25, 0, -8.6, 0, [0.9, 0.9]);
+    put(Mo.armchair(), -3.8, 0, -8.6, 0, [0.9, 0.9]);
+
+    // Cabinet against back wall
+    put(cabinet(2.1), -4.5, 0, -17.15, 0, [2.2, 0.55]);
+
+    // Teacher's desk at the front - positioned with space for chair
+    put(Mo.desk(), -2.1, 0, -17.05, Math.PI, [2.2, 1]);
+    put(Mo.chair('leather'), -2.1, 0, -15.8, Math.PI, [0.6, 0.6]); // Chair positioned in front, not overlapping
+
+    // Pendant lamps with better positioning for atmospheric lighting
+    pendantLamp(-5.1, -11.6);
+    pendantLamp(-2.7, -14.7);
+
+    // Additional library furniture: small side tables with lamps
+    put(Mo.sideTable(), -6.5, 0, -9.5, 0, [0.5, 0.5]);
+    put(Mo.sideTable(), -1.5, 0, -9.5, Math.PI, [0.5, 0.5]);
+
+    // Additional ambient lighting for library atmosphere - wall sconces
+    // Left wall sconce
+    const wallSconceLeft = (x: number, z: number) => {
+      const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.35, 0.08), Mo.MAT.iron);
+      bracket.position.set(x, 2.4, z);
+      root.add(bracket);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshStandardMaterial({
+        color: 0xffe0a0,
+        emissive: 0xffa040,
+        emissiveIntensity: 1.8,
+        roughness: 0.2
+      }));
+      bulb.position.set(x, 2.2, z);
+      root.add(bulb);
+      const light = new THREE.PointLight(0xffb060, 0.7, 4, 2);
+      light.position.set(x, 2.25, z);
+      root.add(light);
+    };
+    wallSconceLeft(-7.0, -8.5);
+    wallSconceLeft(-7.0, -12.0);
+    wallSconceLeft(-7.0, -15.5);
+    
+    // Right wall sconce
+    wallSconceLeft(-0.28, -8.5);
+    wallSconceLeft(-0.28, -12.0);
+    wallSconceLeft(-0.28, -15.5);
+
+    // Subtle floor glow for atmosphere
+    const floorGlowLeft = new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.03, side: THREE.DoubleSide })
+    );
+    floorGlowLeft.position.set(-4, 0.02, -12);
+    floorGlowLeft.rotation.x = -Math.PI / 2;
+    root.add(floorGlowLeft);
+
+    const floorGlowRight = new THREE.Mesh(
+      new THREE.PlaneGeometry(4, 3),
+      new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.03, side: THREE.DoubleSide })
+    );
+    floorGlowRight.position.set(-3, 0.02, -12);
+    floorGlowRight.rotation.x = -Math.PI / 2;
+    root.add(floorGlowRight);
+
+    // More layers of everyday school life in the corridor and classrooms.
+    [-24, -16, -8, 0, 8, 16, 24].forEach((x, i) => {
+      put(noticeBoard(1.25), x, 1.15, 5.98, Math.PI, [1.3, 0.12]);
+      if (i % 2 === 0) put(bin(), x + 1.05, 0, 4.95, 0, [0.4, 0.4]);
+    });
+    [[-23, 3.85], [-18, 3.85], [-3, 3.85], [11, 3.85], [20, 3.85]].forEach(([x, z]) => put(bench(), x, 0, z, Math.PI, [2.1, 0.6]));
+    [[-22.5, -16.8], [-19.5, -16.8], [-14.5, -16.8], [-11.5, -16.8], [-5, -16.6], [-1.5, -16.6], [3.6, -16.7], [6.7, -16.7], [11.5, -16.8], [14.5, -16.8]].forEach(([x, z], i) => put(cabinet(i % 3 === 0 ? 1.8 : 1.25), x, 0, z, 0, [1.6, 0.55]));
+    [[-6.7, -14], [-6.7, -9.5], [7.7, -14], [15.8, -14], [25.8, -14], [25.8, -10]].forEach(([x, z], i) => rainyWindow(x, z, Math.PI / 2, i < 2 ? 1.5 : 1.35));
+    rainyWindow(-3.5, -17.9, 0, 2.2);
+    rainyWindow(4.8, -17.9, 0, 1.7);
+    rainyWindow(13, -17.9, 0, 1.7);
+    rainyWindow(22, -17.9, 0, 2.2);
+    put(noticeBoard(1.7), 22, 1.1, -17.86, 0, [1.8, 0.12]);
+    put(cabinet(2.3), 22, 0, -17.15, 0, [2.4, 0.55]);
+
+    const deskPositions: [number, number][] = [];
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        const dx = 19 + col * 2.55;
+        const dz = -9.3 - row * 2.6;
+        deskPositions.push([dx, dz]);
+        put(schoolDesk(), dx, 0, dz, 0, [1.2, 1.5]);
+      }
+    }
+
+    const deskAt: [number, number] = [deskPositions[0][0], deskPositions[0][1] + 0.8];
+    sign('SHINOHARA', deskPositions[0][0], 0.82, deskPositions[0][1] - 0.34, 0.62, 0.16, Math.PI, '2-b');
+
+    // Seat ring marker
+    const seatRing = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.5, 28), new THREE.MeshBasicMaterial({ color: 0x4f9be8, transparent: true, opacity: 0.85 }));
+    seatRing.rotation.x = -Math.PI / 2;
+    seatRing.position.set(deskAt[0], 0.03, deskAt[1]);
+    root.add(seatRing);
+    anims.push((t) => {
+      const s = 1 + Math.sin(t * 2.8) * 0.1;
+      seatRing.scale.set(s, s, 1);
+    });
+
+    spots.push({ id: 'sabrina_desk_seat', name: 'Sua carteira (2-B)', type: 'EXAMINAR', x: deskAt[0], z: deskAt[1] });
+
+    // Courtyard: small shrine
+    put(Mo.box(4.0, 0.02, 3.5, Mo.MAT.gravel || Mo.std(0x7a7974)), -5, 0.01, 3.5);
+    put(Mo.pillar(2.8), -6.2, 1.4, 2.5);
+    put(Mo.pillar(2.8), -3.8, 1.4, 2.5);
+
+    // NPC sprites
+    const npcSprites: { sprite: THREE.Sprite; npc: SchoolNpc; x: number; z: number; phase: number; collider: { x: number; z: number; w: number; d: number } }[] = [];
+    // simple NPCs for demo
+    npcs.push({ id: 'entrance_student', name: 'Aluno apressado', role: 'Estudante', x: -21, z: 0.5, lines: ['Bom dia!'], dialogueNodeId: 'school_entrance_student' });
+    npcs.push({ id: 'yumi_tanaka', name: 'Yumi Tanaka', role: 'Bibliotecária', x: 0.5, z: -7.5, lines: ['Sabrina. Bom dia.'], dialogueNodeId: 'librarian_yumi' });
+
+    npcs.push(
+      { id: 'emi_hall', name: 'Emi Takahashi', role: 'Estudante', x: -4.5, z: 2.2, lines: ['Você viu os cartazes do festival?'] },
+      { id: 'ken_hall', name: 'Ken Mori', role: 'Estudante', x: 8.5, z: 2.1, lines: ['A aula já vai começar!'] },
+      { id: 'hana_art', name: 'Hana Fujimoto', role: 'Clube de artes', x: 14.2, z: -12.8, lines: ['Estou preparando algo para o festival.'] },
+      { id: 'ryo_class', name: 'Ryo Sato', role: 'Aluno da 2-B', x: 24.5, z: -15.6, lines: ['Essa sala parece maior hoje, né?'] },
+    );
+
+    npcs.push(
+      { id: 'walk_aya', name: 'Aya', role: 'Estudante', x: -16, z: 1.1, lines: ['Com licença!'] },
+      { id: 'walk_yuto', name: 'Yuto', role: 'Estudante', x: -11, z: 2.8, lines: ['Ainda está chovendo lá fora.'] },
+      { id: 'walk_mio', name: 'Mio', role: 'Estudante', x: -1, z: 1.4, lines: ['O festival vai ser incrível.'] },
+      { id: 'walk_sora', name: 'Sora', role: 'Estudante', x: 4, z: 2.7, lines: ['Esqueci meu guarda-chuva.'] },
+      { id: 'walk_ren', name: 'Ren', role: 'Estudante', x: 12, z: 1.2, lines: ['A professora já chegou?'] },
+      { id: 'walk_nana', name: 'Nana', role: 'Estudante', x: 18, z: 2.8, lines: ['Vou pegar um livro antes da aula.'] },
+      { id: 'walk_haru', name: 'Haru', role: 'Estudante', x: 23, z: 1.2, lines: ['Bom dia, Sabrina.'] },
+    );
+
+    npcs.forEach((npc, idx) => {
+      const sprite = createSilhouette(false, 1.58);
+      sprite.position.set(npc.x, 0, npc.z);
+      root.add(sprite);
+      const collider = { x: npc.x, z: npc.z, w: 0.6, d: 0.6 };
+      npcSprites.push({ sprite, npc, x: npc.x, z: npc.z, phase: idx * 1.1, collider });
+      colliders.push(collider);
+    });
+    anims.push((t) => npcSprites.forEach((ns) => {
+      const walking = ns.npc.id.startsWith('walk_');
+      const x = walking ? ns.x + Math.sin(t * 0.45 + ns.phase) * 1.65 : ns.x;
+      const z = walking ? ns.z + Math.cos(t * 0.9 + ns.phase) * 0.3 : ns.z;
+      ns.sprite.position.set(x, Math.abs(Math.sin(t * (walking ? 5 : 2.2) + ns.phase)) * (walking ? 0.05 : 0.03), z);
+      ns.npc.x = x;
+      ns.npc.z = z;
+      ns.collider.x = x;
+      ns.collider.z = z;
+    }));
+
+    // Additional NPCs for more life in the school
+    // Students hanging around different areas
+    npcs.push(
+      { id: 'chat_mio', name: 'Mio Kurosawa', role: 'Amiga de Gabriela', x: -12, z: -7.5, lines: ['Ei, Sabrina! Vi que você gosta de livros.'], dialogueNodeId: 'chat_mio' },
+      { id: 'chat_aya', name: 'Aya Minamoto', role: 'Estudante', x: 10.5, z: -15.5, lines: ['Você pode me ajudar com este problema de matemática?'], dialogueNodeId: 'chat_aya' },
+      { id: 'chat_ren', name: 'Ren Watanabe', role: 'Estudante', x: 15.8, z: -14.2, lines: ['A professora vai chegar em breve.'], dialogueNodeId: 'chat_ren' },
+      { id: 'chat_sora', name: 'Sora Yamamoto', role: 'Clube de Fotografia', x: -22.5, z: -14.8, lines: ['Liest meus fotos do festival ontem.'], dialogueNodeId: 'chat_sora' },
+      { id: 'chat_nana', name: 'Nana Suzuki', role: 'Estudante', x: 20, z: -10.5, lines: ['Você viu o novo episódio do anime?'], dialogueNodeId: 'chat_nana' },
+      { id: 'chat_hana', name: 'Hana Yoshida', role: 'Artista', x: 14.2, z: -13.8, lines: ['Estou trabalhando em uma nova pintura.'], dialogueNodeId: 'chat_hana' }
+    );
+
+    // Nurse NPC in infirmary
+    npcs.push(
+      { id: 'nurse_reiko', name: 'Reiko Arai', role: 'Enfermeira', x: 3.5, z: -14.5, lines: ['Está tudo bem, Sabrina? Você parece pálida.'], dialogueNodeId: 'nurse_reiko' }
+    );
+
+    // Secretary NPC
+    npcs.push(
+      { id: 'secretary_mei', name: 'Mei Chen', role: 'Secretária', x: -13.5, z: -15.5, lines: ['Formulários de inscrição estão na mesa.'], dialogueNodeId: 'secretary_mei' }
+    );
+
+    // Computer room teacher
+    npcs.push(
+      { id: 'computer_teacher', name: 'Prof. Tanaka', role: 'Professor de Informática', x: -20.5, z: -14.5, lines: ['Os computadores estão atualizados hoje.'], dialogueNodeId: 'computer_teacher' }
+    );
+
+    // Courtyard shrine keeper
+    npcs.push(
+      { id: 'courtyard_keeper', name: 'Velho Kashimoto', role: 'Guardião do Santuário', x: -4.5, z: 3.5, lines: ['Que bom ver jovens visitando o santuário.'], dialogueNodeId: 'courtyard_keeper' }
+    );
+
+    const updateCameraOcclusion = (camera: THREE.Camera, player: THREE.Vector3) => {
+      occlusionWalls.forEach((wall) => {
+        const materials = wall.userData.fadeMaterials as THREE.MeshStandardMaterial[];
+        materials.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 1, 14, 1 / 60); });
+      });
+      root.updateMatrixWorld();
+      const direction = player.clone().sub(camera.position);
+      const distance = direction.length();
+      if (distance < 0.01) return;
+      occlusionRay.set(camera.position, direction.normalize());
+      const hit = occlusionRay.intersectObjects(occlusionTargets, false)[0];
+      if (hit && hit.distance < distance - 0.25) {
+        let parent: THREE.Object3D | null = hit.object;
+        while (parent && !occlusionWalls.includes(parent as THREE.Group)) parent = parent.parent;
+        if (parent) {
+          const materials = (parent as THREE.Group).userData.fadeMaterials as THREE.MeshStandardMaterial[];
+          materials?.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 0.14, 18, 1 / 60); });
+        }
+      }
+    };
+
+    const bounds = () => ({ minX: -26.5, maxX: 26.5, minZ: -18.2, maxZ: 6.2 });
+    const animate: Anim = (t, dt) => {
+      anims.forEach((a) => a(t, dt));
+      doorParts.forEach(({ door, pivot }) => {
+        const target = door.isOpen ? -Math.PI / 2 : 0;
+        pivot.rotation.y = THREE.MathUtils.damp(pivot.rotation.y, target, 11, dt);
+      });
+    };
+
+    const toggleDoor = (id: string) => {
+      const part = doorParts.find(({ door }) => door.id === id);
+      if (!part) return;
+      part.door.isOpen = !part.door.isOpen;
+      part.collider.enabled = !part.door.isOpen;
+    };
+
+    (root.userData as any).signs = signMeshes;
+
+    return {
+      group: root,
+      colliders,
+      npcs,
+      spots,
+      doors,
+      toggleDoor,
+      updateCameraOcclusion,
+      deskAt,
+      bounds,
+      animate,
+      dispose: () => {
+        root.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.geometry) try { m.geometry.dispose(); } catch {}
+          if (m.material) try { (m.material as any).dispose?.(); } catch {}
+        });
+        root.removeFromParent();
+      },
+    };
   };
-};
+  // stray legacy call removed (was causing `box is not defined` at runtime)

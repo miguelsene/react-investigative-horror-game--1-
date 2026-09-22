@@ -11,6 +11,7 @@ interface TitleScreenProps {
   onOpenSettings: () => void;
   onExtra: () => void;
   onDeveloper: () => void;
+  onAudioStart: () => void;
 }
 
 export const TitleScreen: React.FC<TitleScreenProps> = ({
@@ -23,6 +24,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onOpenSettings,
   onExtra,
   onDeveloper,
+  onAudioStart,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [phase, setPhase] = useState<'attract' | 'menu'>('attract');
@@ -117,8 +119,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
     soundManager.startRain();
     soundManager.startDrone(42);
     soundManager.playRadioStatic(0.6);
+    onAudioStart();
     setPhase('menu');
-  }, []);
+  }, [onAudioStart]);
 
   const items = [
     { id: 'continue', label: 'CONTINUAR', sub: 'Retomar o caso salvo', disabled: !hasSavedGame },
@@ -185,7 +188,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black overflow-hidden select-none"
+      className="title-screen fixed inset-0 bg-black overflow-hidden select-none"
       onClick={() => {
         if (ready && phase === 'attract') start();
       }}
@@ -207,20 +210,21 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
       )}
 
       {/* Title */}
-      <div className="absolute inset-x-0 top-[12%] sm:top-[14%] flex flex-col items-center text-center z-20 pointer-events-none px-4">
+      <div className="title-screen-heading absolute inset-x-0 top-[12%] sm:top-[14%] flex flex-col items-center text-center z-20 pointer-events-none px-4">
         <span className="font-serif-jp text-[11px] tracking-[0.55em] text-neutral-400 uppercase fade-up">京都 · 未解決</span>
-        <h1 className="title-in title-glow font-title font-black text-[11vw] sm:text-[6.5rem] leading-[0.95] text-[#e8e4dc] mt-3 tracking-[0.08em]">
+        <h1 className="title-in title-glow title-screen-name font-title font-black text-[11vw] sm:text-[6.5rem] leading-[0.95] text-[#e8e4dc] mt-3 tracking-[0.08em]">
           Quem é você?
         </h1>
         <div className="mt-5 h-px w-44 bg-gradient-to-r from-transparent via-red-700/90 to-transparent" />
         {/* Ordem Paranormal brand mark */}
-        <div className="mt-5 fade-up" style={{ animationDelay: '0.8s' }}>
-          <img
-            src="/images/ordem-paranormal.svg"
-            alt="Ordem Paranormal"
-            className="h-11 sm:h-14 w-auto opacity-90 drop-shadow-[0_0_18px_rgba(198,40,40,0.25)]"
-            draggable={false}
-          />
+        <div className="title-brand mt-5 fade-up" style={{ animationDelay: '0.8s' }}>
+            <img
+              src="/images/op_logo.png"
+              alt="Op Logo"
+              className="opacity-90 drop-shadow-[0_0_18px_rgba(198,40,40,0.25)]"
+              style={{ width: '500px', height: '450px' }}
+              draggable={false}
+            />
         </div>
         <span className="font-serif-jp text-xs tracking-[0.35em] text-neutral-500 mt-4 uppercase fade-up" style={{ animationDelay: '1.2s' }}>
           Terror investigativo · Kyoto

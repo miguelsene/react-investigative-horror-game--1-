@@ -172,10 +172,12 @@ export const InspectionModal: React.FC<InspectionModalProps> = ({ data, onClose,
     });
     resize.observe(mount);
 
-    const clock = new THREE.Clock();
+    const clock = new THREE.Timer();
+    clock.connect(document);
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      clock.update();
       const dt = Math.min(clock.getDelta(), 0.05);
       if (document.hidden) return;
       const object = objectRef.current;
@@ -200,6 +202,7 @@ export const InspectionModal: React.FC<InspectionModalProps> = ({ data, onClose,
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      clock.dispose();
       resize.disconnect();
       dom.removeEventListener('pointerdown', onDown);
       dom.removeEventListener('pointermove', onMove);

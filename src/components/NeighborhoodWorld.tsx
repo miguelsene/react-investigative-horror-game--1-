@@ -121,12 +121,14 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
 
-    const clock = new THREE.Clock();
+    const clock = new THREE.Timer();
+    clock.connect(document);
     let raf = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
+      clock.update();
       const dt = Math.min(clock.getDelta(), 0.05);
-      const t = clock.elapsedTime;
+      const t = clock.getElapsed();
       if (document.hidden) return;
       street.animate(t, dt);
 
@@ -221,6 +223,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      clock.dispose();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
