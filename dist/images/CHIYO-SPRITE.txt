@@ -1,0 +1,36 @@
+Chiyo: raster sprite sheet — NOT YET SUPPLIED
+
+Expected file: chiyo_sheet.png (this directory)
+Reader: src/three/chiyoSprite.ts
+
+Status
+------
+The drawing does not exist yet. The image-generation quota for the session in
+which this pipeline was written had already been exhausted, so no new artwork
+could be produced. Until the file is added, src/three/models.ts keeps using the
+previous programmatic art for Chiyo. Nothing breaks: loadChiyoSheet() resolves
+to null and the fallback stays on screen.
+
+Expected format
+---------------
+Grid: 4 columns x 3 rows (12 cells), same convention as gabriela_sheet.png.
+Background: transparent, or a uniform near-white matte (it is removed in the
+shader at sample time, the same way Gabriela's sheet is handled).
+
+Cells read by the current code:
+  0 - front, standing idle
+  1 - front, stirring with the ladle
+  2 - front, idle variation (breathing)
+  3 - front, stirring follow-through
+
+Remaining cells are reserved for side and back views if she ever walks.
+
+Character notes
+---------------
+74 years old, slightly stooped, shorter and rounder than Gabriela.
+Silver-grey hair in a neat bun with a small wooden hairpin.
+Indigo kimono under a white cooking apron (kappogi).
+Brown wooden geta sandals. Warm, kind expression.
+Consistent in scale with gabriela_sheet.png so both read as the same world.
+
+Once the PNG is dropped in, Chiyo switches over automatically on next load.

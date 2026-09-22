@@ -1,0 +1,25 @@
+Gabriela: raster sprite sheet
+
+File: gabriela_sheet.png (the original image is JPEG-encoded).
+Source: original pixel-art image generated for this project in an earlier iteration.
+Grid: four columns, three rows. Not a uniform direction-per-row sheet.
+
+Cells, numbered left to right, top to bottom:
+0: front idle
+1: front step
+2: front alternate step
+3: back step
+4: back idle
+5: back idle variation
+6: right profile stride
+7: back alternate step
+8: back variation
+9: left profile passing pose
+10: right profile stride variation
+11: right profile alternate stride
+
+The game reads the raster directly with TextureLoader and selects UV frames.
+It does not draw Gabriela with Canvas, CSS shapes or procedural vector paths.
+The source's near-white background is removed at sampling time.
+No new illustration was generated in this update because the image-generation
+quota had already been exhausted.

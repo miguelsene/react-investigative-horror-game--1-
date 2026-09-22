@@ -1,0 +1,60 @@
+import { Chapter } from '../types/game';
+
+export const INITIAL_CHAPTERS: Chapter[] = [
+  {
+    number: 1,
+    title: '3:17',
+    subtitle: 'Caso nº 001 — Residência',
+    description: 'Um dia comum começa às 06:20 e termina exatamente onde Sabrina não quer olhar: às 03:17. Entre a escola, a avó, Watson e sete relógios, a normalidade se desfaz devagar.',
+    isUnlocked: true,
+    isCompleted: false,
+  },
+  {
+    number: 2,
+    title: '03:17',
+    subtitle: 'A Frequência Oculta',
+    description: 'Um padrão numérico perturbador emerge. O telefone da sala toca exatamente às 03:17 da madrugada, quebrando o silêncio de Kyoto.',
+    isUnlocked: false,
+    isCompleted: false,
+  },
+  {
+    number: 3,
+    title: 'A FOTOGRAFIA',
+    subtitle: 'O Anacronismo Impossível',
+    description: 'A fotografia encontrada no escritório mostra a mesma casa e uma garota com os mesmos traços de Gabriela — mas foi tirada em 1974.',
+    isUnlocked: false,
+    isCompleted: false,
+  },
+  {
+    number: 4,
+    title: 'O SANTUÁRIO',
+    subtitle: 'Os Portões Vermelhos de Fushimi',
+    description: 'A investigação conduz Gabriela para as encostas de um santuário xintoísta antigo durante a névoa da tarde. Pegadas sem retorno.',
+    isUnlocked: false,
+    isCompleted: false,
+  },
+  {
+    number: 5,
+    title: 'A FLORESTA',
+    subtitle: 'A Inconsistência do Espaço',
+    description: 'As distâncias entre as árvores deixam de ser euclidianas. O método científico de Gabriela é testado até o limite do absurdo.',
+    isUnlocked: false,
+    isCompleted: false,
+  },
+  {
+    number: 6,
+    title: 'A AVÓ',
+    subtitle: 'O Silêncio de Chiyo',
+    description: 'A avó sempre soube. Cada xícara de chá verde, cada relógio adiantado, cada aviso disfarçado de conselho carinhoso guardava um segredo antigo.',
+    isUnlocked: false,
+    isCompleted: false,
+  },
+  {
+    number: 7,
+    title: 'A VERDADE',
+    subtitle: 'O Ponto de Convergência',
+    description: 'Todas as pistas do quadro convergem. O confronto final entre a razão implacável e o horror que desafia o próprio tempo.',
+    isUnlocked: false,
+    isCompleted: false,
+  },
+];
