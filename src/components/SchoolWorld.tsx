@@ -37,56 +37,46 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     if (!mount) return;
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     } catch {
       return;
     }
     renderer.setSize(Math.max(1, mount.clientWidth), Math.max(1, mount.clientHeight));
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    // Shadows disabled in school — too many PointLights make it prohibitively expensive
+    renderer.shadowMap.enabled = false;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x020304);
     scene.fog = new THREE.FogExp2(0x090807, 0.045);
-    scene.add(new THREE.HemisphereLight(0xffe7b0, 0x121822, 1.15));
-    const sun = new THREE.DirectionalLight(0xffd68a, 1.15);
+    // Hemisphere for ambient fill — cheap
+    scene.add(new THREE.HemisphereLight(0xffe7b0, 0x121822, 1.3));
+    // One directional key light — no shadow (school is interior, lit by ceiling strips)
+    const sun = new THREE.DirectionalLight(0xffd68a, 0.5);
     sun.position.set(-10, 11, 8);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -32;
-    sun.shadow.camera.right = 32;
-    sun.shadow.camera.top = 22;
-    sun.shadow.camera.bottom = -22;
-    sun.shadow.bias = -0.0008;
+    sun.castShadow = false;
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(0x9fb7d1, 0.34);
-    fill.position.set(9, 7, -6);
-    scene.add(fill);
-    const key = new THREE.PointLight(0xffc86b, 1.15, 30, 2);
-    key.position.set(0, 4.2, 0);
-    scene.add(key);
+    // No fill or key PointLight — school room lights handle ambiance per-room
 
     const school = buildSchool();
-    school.group.traverse((object) => {
-      const mesh = object as THREE.Mesh;
-      if (mesh.isMesh) { mesh.castShadow = true; mesh.receiveShadow = true; }
-    });
+    // Do NOT cast/receive shadows per-mesh — too expensive with ~900 meshes and no shadow map
     scene.add(school.group);
-    [[-21, -12, 0xffbf6e], [-13, -12, 0xffd299], [-4, -12, 0xffc072], [5, -12, 0xffd8a2], [13, -12, 0xffa85f], [22, -12, 0xffd39c]].forEach(([x, z, color]) => {
-      const lamp = new THREE.PointLight(color, 0.62, 7, 2);
-      lamp.position.set(x, 3.05, z);
+    // 3 corridor accent lights instead of 6 — halves the room light count from SchoolWorld side
+    [[-16, -12, 0xffd299], [-2, -12, 0xffc072], [17, -12, 0xffd39c]].forEach(([x, z, color]) => {
+      const lamp = new THREE.PointLight(color as number, 0.45, 12, 2);
+      lamp.position.set(x as number, 3.05, z as number);
       scene.add(lamp);
     });
-    const dustPositions = new Float32Array(110 * 3);
-    for (let i = 0; i < 110; i++) { dustPositions[i * 3] = -25 + Math.random() * 50; dustPositions[i * 3 + 1] = 0.6 + Math.random() * 2.7; dustPositions[i * 3 + 2] = -17 + Math.random() * 22; }
+    // Static dust — no per-frame buffer upload
+    const dustPositions = new Float32Array(60 * 3);
+    for (let i = 0; i < 60; i++) { dustPositions[i * 3] = -25 + Math.random() * 50; dustPositions[i * 3 + 1] = 0.6 + Math.random() * 2.7; dustPositions[i * 3 + 2] = -17 + Math.random() * 22; }
     const dustGeometry = new THREE.BufferGeometry();
     dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-    const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({ color: 0xf2d9ae, size: 0.035, transparent: true, opacity: 0.28, depthWrite: false }));
+    const dust = new THREE.Points(dustGeometry, new THREE.PointsMaterial({ color: 0xf2d9ae, size: 0.04, transparent: true, opacity: 0.22, depthWrite: false }));
     scene.add(dust);
     const signMeshes: THREE.Mesh[] = (school.group as any).userData.signs || [];
     let lastRoom: string | null = null;
@@ -198,6 +188,8 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     clock.connect(document);
     let raf = 0;
     let stepTimer = 0;
+    // Throttle occlusion updates — every 3rd frame is enough (saves ~60 damp calls/frame)
+    let occlusionFrame = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
       clock.update();
@@ -205,11 +197,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       const t = clock.getElapsed();
       if (document.hidden) return;
       school.animate(t, dt);
-      for (let i = 0; i < dustPositions.length / 3; i++) {
-        dustPositions[i * 3] += Math.sin(t * 0.35 + i) * 0.0008;
-        dustPositions[i * 3 + 1] += Math.cos(t * 0.24 + i * 0.6) * 0.0005;
-      }
-      dustGeometry.attributes.position.needsUpdate = true;
+      // Dust is static — no per-frame upload needed
 
       const oldX = pos.x;
       const oldZ = pos.z;
@@ -254,7 +242,9 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       shadow.position.set(pos.x, 0.035, pos.z);
 
       rig.update(pos, vx, vz, dt, t, zoomLevelRef.current, live.current.cameraMotionEnabled, live.current.paused);
-      school.updateCameraOcclusion(camera, pos);
+      // Run occlusion every 3 frames — imperceptible latency, saves ~60 material.opacity damps/frame
+      occlusionFrame++;
+      if (occlusionFrame % 3 === 0) school.updateCameraOcclusion(camera, pos);
 
       // Nearest interactable NPC
       let bestDoor: SchoolDoor | null = null;

@@ -163,6 +163,10 @@ export const App: React.FC = () => {
       soundManager.transitionMusicFile('/musicas/trilha_home.mp3');
     } else if (activeScreen === 'gameplay' && worldArea === 'house') {
       soundManager.transitionMusicFile('/musicas/manha.mp3');
+    } else if (activeScreen === 'gameplay' && (worldArea === 'street' || worldArea === 'return')) {
+      soundManager.transitionMusicFile('/musicas/trilha_home.mp3');
+    } else if (activeScreen === 'gameplay' && (worldArea === 'school' || worldArea === 'schoolhall')) {
+      soundManager.transitionMusicFile('/musicas/escola.mp3');
     } else {
       soundManager.stopMusic();
     }
