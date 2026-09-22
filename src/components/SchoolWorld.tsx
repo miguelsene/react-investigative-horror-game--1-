@@ -29,6 +29,8 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
   const [talkingTo, setTalkingTo] = useState<SchoolNpc | null>(null);
   const [lineIndex, setLineIndex] = useState(0);
   const [hud, setHud] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(0);
+  const zoomLevelRef = useRef<number>(0);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -47,11 +49,17 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xe4e6e6);
-    scene.fog = new THREE.FogExp2(0xe4e6e6, 0.022);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x736a58, 1.3));
-    const key = new THREE.DirectionalLight(0xfff3de, 0.7);
-    key.position.set(-5, 10, 7);
+    scene.background = new THREE.Color(0xeef2ec);
+    scene.fog = new THREE.FogExp2(0xeef2ec, 0.018);
+    scene.add(new THREE.HemisphereLight(0xfffbe6, 0x6a6150, 1.45));
+    const sun = new THREE.DirectionalLight(0xfff0c8, 0.9);
+    sun.position.set(-10, 11, 8);
+    scene.add(sun);
+    const fill = new THREE.DirectionalLight(0xcfe3ff, 0.4);
+    fill.position.set(9, 7, -6);
+    scene.add(fill);
+    const key = new THREE.PointLight(0xfff2cf, 0.8, 30, 2);
+    key.position.set(0, 4.2, 0);
     scene.add(key);
 
     const school = buildSchool();
@@ -60,7 +68,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     const camera = new THREE.PerspectiveCamera(46, mount.clientWidth / mount.clientHeight, 0.1, 90);
     // Start at entrance near getabako
     const pos = new THREE.Vector3(-22, 0, 1.2);
-    const rig = new ExplorationCamera(camera, pos, 0, { height: 7.2, distance: 10.4, look: 0.7 });
+    const rig = new ExplorationCamera(camera, pos, zoomLevelRef.current, { height: 7.2, distance: 10.4, look: 0.7 });
 
     const keys: Record<string, boolean> = {};
     let character: ReturnType<typeof createGabrielaSprite> | null = null;
@@ -117,17 +125,42 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest('input,textarea,select')) return;
-      keys[e.key.toLowerCase()] = true;
+      const key = e.key.toLowerCase();
+      keys[key] = true;
       if (e.key.startsWith('Arrow')) e.preventDefault();
-      if (e.key.toLowerCase() === 'e' && !e.repeat) talk();
+      if (key === 'e' && !e.repeat) talk();
+      if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
+        e.preventDefault();
+        const next = Math.min(2, zoomLevelRef.current + 1);
+        zoomLevelRef.current = next;
+        setZoomLevel(next);
+        soundManager.playClockTick();
+      } else if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract') {
+        e.preventDefault();
+        const next = Math.max(0, zoomLevelRef.current - 1);
+        zoomLevelRef.current = next;
+        setZoomLevel(next);
+        soundManager.playClockTick();
+      }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       keys[e.key.toLowerCase()] = false;
     };
     const onBlur = () => Object.keys(keys).forEach((k) => (keys[k] = false));
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1 : -1;
+      const next = Math.min(2, Math.max(0, zoomLevelRef.current + delta));
+      if (next !== zoomLevelRef.current) {
+        zoomLevelRef.current = next;
+        setZoomLevel(next);
+      }
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    window.addEventListener('wheel', onWheel, { passive: false });
 
     const clock = new THREE.Clock();
     let raf = 0;
@@ -181,7 +214,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       character?.sprite.position.set(pos.x, 0, pos.z);
       shadow.position.set(pos.x, 0.035, pos.z);
 
-      rig.update(pos, vx, vz, dt, t, 0, live.current.cameraMotionEnabled, live.current.paused);
+      rig.update(pos, vx, vz, dt, t, zoomLevelRef.current, live.current.cameraMotionEnabled, live.current.paused);
 
       // Nearest interactable NPC
       let bestNpc: SchoolNpc | null = null;
@@ -239,6 +272,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      window.removeEventListener('wheel', onWheel);
       window.removeEventListener('resize', onResize);
       character?.dispose();
       school.dispose();
@@ -287,6 +321,36 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
           onClose={() => setTalkingTo(null)}
         />
       )}
+
+      <div className="absolute bottom-5 right-28 z-20 flex items-center gap-1.5 bg-black/60 border border-neutral-800/80 px-2.5 py-1 rounded-full backdrop-blur-md">
+        <button
+          onClick={() => {
+            const next = Math.max(0, zoomLevel - 1);
+            zoomLevelRef.current = next;
+            setZoomLevel(next);
+            soundManager.playClockTick();
+          }}
+          className="w-6 h-6 rounded-full hover:bg-white/10 flex items-center justify-center font-bold text-xs text-neutral-300"
+          title="Afastar [-]"
+        >
+          −
+        </button>
+        <span className="font-mono text-[10px] text-neutral-400 tracking-wider px-1">
+          {zoomLevel === 0 ? '1x' : zoomLevel === 1 ? '1.5x' : '2.2x'}
+        </span>
+        <button
+          onClick={() => {
+            const next = Math.min(2, zoomLevel + 1);
+            zoomLevelRef.current = next;
+            setZoomLevel(next);
+            soundManager.playClockTick();
+          }}
+          className="w-6 h-6 rounded-full hover:bg-white/10 flex items-center justify-center font-bold text-xs text-neutral-300"
+          title="Aproximar [+]"
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 };

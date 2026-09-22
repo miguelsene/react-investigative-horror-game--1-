@@ -49,13 +49,13 @@ export const buildSchool = (): SchoolBuild => {
     plane: new THREE.PlaneGeometry(1, 1),
   };
 
-  const concrete = new THREE.MeshStandardMaterial({ map: facadeTexture('#a9a49a', '#efe9dc', 2), roughness: 0.95 });
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xd9d4c7, roughness: 0.95 });
-  const wainscot = new THREE.MeshStandardMaterial({ color: 0x4f6153, roughness: 0.85 });
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0x9c8b73, roughness: 0.8 });
-  const floorCorridor = new THREE.MeshStandardMaterial({ color: 0x6e6354, roughness: 0.85 });
-  const woodMat = new THREE.MeshStandardMaterial({ color: 0x8f6b45, roughness: 0.65 });
-  const woodDark = new THREE.MeshStandardMaterial({ color: 0x5b4026, roughness: 0.65 });
+  const concrete = new THREE.MeshStandardMaterial({ map: facadeTexture('#b4aa8e', '#f6f0e5', 2), roughness: 0.9 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1ead9, roughness: 0.9, metalness: 0.08 });
+  const wainscot = new THREE.MeshStandardMaterial({ color: 0x5d7865, roughness: 0.78 });
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0xa58e72, roughness: 0.82 });
+  const floorCorridor = new THREE.MeshStandardMaterial({ color: 0x7a6857, roughness: 0.8 });
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x9a7346, roughness: 0.6 });
+  const woodDark = new THREE.MeshStandardMaterial({ color: 0x674a2a, roughness: 0.7 });
   const metalMat = new THREE.MeshStandardMaterial({ color: 0x9aa2aa, roughness: 0.35, metalness: 0.6 });
   const boardMat = new THREE.MeshStandardMaterial({ color: 0x203a2c, roughness: 0.6 });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0xbcd6e8, roughness: 0.15, metalness: 0.25, transparent: true, opacity: 0.5 });
@@ -87,7 +87,7 @@ export const buildSchool = (): SchoolBuild => {
   // Floors
   box(floorMat, 0, -0.05, 0, 56, 0.1, 14, false);
   box(floorCorridor, 0, 0.01, 0, 54, 0.02, 6, false); // Center walkway
-  box(new THREE.MeshStandardMaterial({ color: 0xece8dd, roughness: 1 }), 0, 4.2, 0, 56, 0.2, 14, false);
+  // Sem teto: a escola fica aberta como a casa e a rua, para manter a câmera livre.
 
   // Outer South Wall with Lockers
   box(concrete, 0, 2.1, 6.9, 56, 4.2, 0.24);
