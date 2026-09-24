@@ -213,6 +213,8 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 @keyframes dreamWarp { 0%,100% { opacity: .5; transform: scale(1) rotate(0deg); filter: hue-rotate(0deg) blur(1px) } 50% { opacity: .9; transform: scale(1.08) rotate(1.5deg); filter: hue-rotate(24deg) blur(3px) } }
 @keyframes dreamCueDrain { from { transform: scaleX(1) } to { transform: scaleX(0) } }
 .dream-warp-layer { opacity: .65; mix-blend-mode: screen; animation: dreamWarp 6s ease-in-out infinite; }
+.minigame-pixel-panel { padding: 1.25rem; border: 1px solid rgba(196,160,112,.3); background: linear-gradient(145deg, rgba(14,13,16,.97), rgba(24,19,19,.96)); box-shadow: 0 28px 90px rgba(0,0,0,.72), inset 0 0 36px rgba(105,67,50,.08); }
+.minigame-pixel-panel svg[shape-rendering="crispEdges"] { image-rendering: pixelated; }
 @keyframes loadingScan { 50% { transform: scaleX(.35); opacity: .35 } }
 
 /* ---------- Generic ---------- */

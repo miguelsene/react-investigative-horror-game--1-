@@ -25,7 +25,7 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
   const [hits, setHits] = useState(0);
   const [misses, setMisses] = useState(0);
   const [cue, setCue] = useState<Cue | null>(null);
-  const [zoom, setZoom] = useState(21);
+  const [zoom, setZoom] = useState(27);
   const [phase, setPhase] = useState<'playing' | 'failed' | 'complete'>('playing');
   const stateRef = useRef({ round, hits, misses, cue, phase });
   stateRef.current = { round, hits, misses, cue, phase };
@@ -67,14 +67,21 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
     catch { return; }
     const scene = new Scene(engine);
     scene.clearColor = new Color4(0.95, 0.97, 0.99, 1);
-    const camera = new ArcRotateCamera('dream-camera', -Math.PI / 2, 1.05, 21, new Vector3(0, 0.8, 0), scene);
+    const camera = new ArcRotateCamera('dream-camera', -Math.PI / 2, 1.05, 27, new Vector3(0, 0.8, 0), scene);
     cameraRef.current = camera;
-    camera.lowerRadiusLimit = 8; camera.upperRadiusLimit = 30; camera.radius = stateRef.current.phase === 'playing' ? 21 : 21; camera.inputs.clear();
+    camera.lowerRadiusLimit = 10; camera.upperRadiusLimit = 38; camera.radius = 27; camera.inputs.clear();
     new HemisphericLight('white-room-light', new Vector3(0.2, 1, -0.2), scene).intensity = 1.1;
-    const floor = MeshBuilder.CreateGround('endless-white-floor', { width: 80, height: 80 }, scene);
-    const floorMat = new StandardMaterial('floor-white', scene); floorMat.diffuseColor = new Color3(0.98, 0.985, 0.99); floorMat.specularColor = Color3.Black(); floor.material = floorMat;
+    const floor = MeshBuilder.CreateGround('endless-white-floor', { width: 120, height: 120 }, scene);
+    const floorMat = new StandardMaterial('floor-white', scene); floorMat.diffuseColor = new Color3(0.79, 0.81, 0.86); floorMat.specularColor = Color3.Black(); floor.material = floorMat;
 
-    scene.fogMode = Scene.FOGMODE_EXP2; scene.fogColor = new Color3(0.98, 0.985, 0.995); scene.fogDensity = 0.012;
+    scene.fogMode = Scene.FOGMODE_EXP2; scene.fogColor = new Color3(0.78, 0.8, 0.86); scene.fogDensity = 0.009;
+    // Faint concentric scars make the dream feel like a much larger, broken space.
+    const scarMat = new StandardMaterial('dream-scar-material', scene);
+    scarMat.diffuseColor = Color3.Black(); scarMat.emissiveColor = new Color3(0.16, 0.18, 0.24); scarMat.alpha = 0.34; scarMat.transparencyMode = StandardMaterial.MATERIAL_ALPHABLEND; scarMat.specularColor = Color3.Black();
+    [18, 25, 33].forEach((diameter, i) => {
+      const scar = MeshBuilder.CreateTorus(`dream-floor-scar-${i}`, { diameter, thickness: 0.035, tessellation: 96 }, scene);
+      scar.position.y = 0.025 + i * 0.004; scar.rotation.x = Math.PI / 2; scar.material = scarMat;
+    });
     const heroPos = new Vector3(0, 0, 0);
     let spriteImage: HTMLImageElement | null = null;
     const drawSpriteFrame = (texture: DynamicTexture, cell: number, black: boolean, mirror: boolean) => {
@@ -114,7 +121,7 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
       const angle = i / TOTAL * Math.PI * 2;
       const texture = new DynamicTexture(`shadow-sprite-${i}`, { width: 1, height: 1 }, scene, false);
       copyTextures.push(texture);
-      return makeSprite(`shadow-copy-${i + 1}`, texture, true, new Vector3(Math.cos(angle) * 11, 1.12, Math.sin(angle) * 11));
+      return makeSprite(`shadow-copy-${i + 1}`, texture, true, new Vector3(Math.cos(angle) * 16, 1.12, Math.sin(angle) * 16));
     });
     let lastHeroCell = '';
     const lastCopyCell = Array(TOTAL).fill('');
@@ -136,7 +143,7 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
     const anomalies = Array.from({ length: TOTAL }, (_, i) => {
       const angle = i / TOTAL * Math.PI * 2;
       const ring = MeshBuilder.CreateTorus(`dream-anomaly-${i + 1}`, { diameter: 1.05, thickness: 0.055, tessellation: 16 }, scene);
-      ring.position.set(Math.cos(angle) * 7.5, 1.45 + (i % 2) * 0.55, Math.sin(angle) * 7.5);
+      ring.position.set(Math.cos(angle) * 10.5, 1.45 + (i % 2) * 0.55, Math.sin(angle) * 10.5);
       ring.billboardMode = Mesh.BILLBOARDMODE_ALL;
       ring.material = anomalyMats[i % anomalyMats.length];
       return ring;
@@ -145,12 +152,12 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
     const keys = new Set<string>();
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      if (key === '+' || key === '=') { e.preventDefault(); setZoom((v) => Math.max(8, v - 2)); }
-      else if (key === '-' || key === '_') { e.preventDefault(); setZoom((v) => Math.min(30, v + 2)); }
+      if (key === '+' || key === '=') { e.preventDefault(); setZoom((v) => Math.max(10, v - 2)); }
+      else if (key === '-' || key === '_') { e.preventDefault(); setZoom((v) => Math.min(38, v + 2)); }
       else if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { e.preventDefault(); keys.add(key); }
     };
     const up = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
-    const wheel = (e: WheelEvent) => { e.preventDefault(); setZoom((v) => Math.max(8, Math.min(30, v + Math.sign(e.deltaY) * 1.5))); };
+    const wheel = (e: WheelEvent) => { e.preventDefault(); setZoom((v) => Math.max(10, Math.min(38, v + Math.sign(e.deltaY) * 1.5))); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     canvas.addEventListener('wheel', wheel, { passive: false });
     let elapsed = 0;
@@ -163,8 +170,8 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
       const dx = Number(keys.has('d') || keys.has('arrowright')) - Number(keys.has('a') || keys.has('arrowleft'));
       const dz = Number(keys.has('s') || keys.has('arrowdown')) - Number(keys.has('w') || keys.has('arrowup'));
       const len = Math.hypot(dx, dz) || 1;
-      heroPos.x = Math.max(-9, Math.min(9, heroPos.x + dx / len * dt * (3.8 + s.misses * 0.25)));
-      heroPos.z = Math.max(-8, Math.min(8, heroPos.z + dz / len * dt * (3.8 + s.misses * 0.25)));
+      heroPos.x = Math.max(-13, Math.min(13, heroPos.x + dx / len * dt * (3.8 + s.misses * 0.25)));
+      heroPos.z = Math.max(-12, Math.min(12, heroPos.z + dz / len * dt * (3.8 + s.misses * 0.25)));
       player.position.x = heroPos.x; player.position.z = heroPos.z;
       player.position.y = 1.12 + Math.abs(Math.sin(elapsed * 9)) * (dx || dz ? 0.12 : 0.025);
       player.rotation.z = dx ? Math.sign(dx) * Math.sin(elapsed * 10) * 0.035 : 0;
@@ -192,7 +199,7 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
         copy.rotation.y = Math.sin(elapsed * 5 + i) * 0.05;
       });
       camera.target.copyFromFloats(heroPos.x + Math.sin(elapsed * 31) * s.misses * 0.04, 0.8, heroPos.z + Math.cos(elapsed * 27) * s.misses * 0.04);
-      camera.fov = 0.8 + s.misses * 0.018;
+      camera.fov = 0.88 + s.misses * 0.022;
       scene.render();
     });
     const resize = () => engine.resize(); window.addEventListener('resize', resize);
@@ -207,11 +214,11 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
   const retry = () => {
     lastStrikeRef.current = 0;
     stateRef.current = { round: 0, hits: 0, misses: 0, cue: null, phase: 'playing' };
-    setRound(0); setHits(0); setMisses(0); setCue(null); setPhase('playing'); setZoom(21);
+    setRound(0); setHits(0); setMisses(0); setCue(null); setPhase('playing'); setZoom(27);
   };
   return <div className="fixed inset-0 z-[70] bg-black text-white">
     <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-label="Gabriela foge de cópias sombrias no espaço branco" />
-    <div aria-hidden="true" className="dream-warp-layer absolute inset-0 pointer-events-none" style={{ backgroundImage: `radial-gradient(ellipse at 18% 26%, rgba(255,55,85,${0.08 + misses * 0.07}), transparent 42%), radial-gradient(ellipse at 80% 74%, rgba(105,90,255,${0.08 + misses * 0.06}), transparent 45%), repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.04) 0 1px, transparent 2px 5px)`, mixBlendMode: 'screen', opacity: 0.45 + misses * 0.12 }} />
+    <div aria-hidden="true" className="dream-warp-layer absolute inset-0 pointer-events-none" style={{ backgroundImage: `radial-gradient(ellipse at 18% 26%, rgba(255,55,85,${0.08 + misses * 0.07}), transparent 42%), radial-gradient(ellipse at 80% 74%, rgba(105,90,255,${0.08 + misses * 0.06}), transparent 45%), repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.04) 0 1px, transparent 2px 5px)`, mixBlendMode: 'screen', opacity: 0.45 + misses * 0.12, backdropFilter: `blur(${0.6 + misses * 0.55}px) saturate(${0.75 - misses * 0.04})` }} />
     {phase === 'playing' && <div className="absolute inset-0 pointer-events-none">
       <div className="absolute left-1/2 top-7 -translate-x-1/2 rounded-sm border border-white/50 bg-black/65 px-5 py-3 text-center font-serif-jp text-sm tracking-wide text-white shadow-xl">WASD / setas: fuja. As marcas surgem por instantes; toque nelas antes que desapareçam.</div>
       {cue && <button onClick={strike} className="pointer-events-auto absolute z-10 grid h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-red-100/90 bg-red-950/55 shadow-[0_0_42px_rgba(255,55,75,.9)] animate-pulse" style={{ left: `${cue.x}%`, top: `${cue.y}%` }} aria-label="Toque rápido: acerte o evento no tempo">
@@ -220,9 +227,9 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
       </button>}
       {!cue && <div className="absolute left-1/2 top-1/2 -translate-x-1/2 rounded border border-white/20 bg-black/35 px-4 py-2 font-serif-jp text-[11px] tracking-[0.2em] text-white/60">NÃO OLHE PARA TRÁS</div>}
       <div className="absolute bottom-7 right-7 flex items-center gap-2 rounded-full border border-white/30 bg-black/65 px-3 py-2 pointer-events-auto">
-        <button onClick={() => setZoom((v) => Math.min(30, v + 2))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Afastar zoom">−</button>
-        <span className="min-w-12 text-center font-mono text-[10px]">{(21 / zoom).toFixed(1)}×</span>
-        <button onClick={() => setZoom((v) => Math.max(8, v - 2))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Aproximar zoom">+</button>
+        <button onClick={() => setZoom((v) => Math.min(38, v + 2))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Afastar zoom">−</button>
+        <span className="min-w-12 text-center font-mono text-[10px]">{(27 / zoom).toFixed(1)}×</span>
+        <button onClick={() => setZoom((v) => Math.max(10, v - 2))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Aproximar zoom">+</button>
       </div>
       <div className="absolute bottom-5 left-6 font-serif-jp text-xs tracking-[0.3em]">ACERTOS {hits}/6 <span className="mx-3 text-red-300">ERROS {misses}/4</span></div>
     </div>}

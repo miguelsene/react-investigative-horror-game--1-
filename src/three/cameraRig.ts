@@ -31,17 +31,18 @@ export class ExplorationCamera {
   private lookHeight = 0.65;
   private impulse = 0;
   private roll = 0;
+  private side: 1 | -1 = 1;
 
   constructor(
     private camera: THREE.PerspectiveCamera,
     position: THREE.Vector3,
     zoom: number,
-    private override?: { height: number; distance: number; look: number },
+    private override?: { height: number; distance: number; look: number; zoomScale?: number[]; zoomHeightScale?: number[] },
   ) {
     const view = this.viewFor(zoom);
     this.anchor.copy(position);
     this.lookHeight = view.look;
-    camera.position.set(position.x, view.height, position.z + view.distance);
+    camera.position.set(position.x, view.height, position.z + this.side * view.distance);
     camera.lookAt(position.x, view.look, position.z);
     camera.updateMatrixWorld();
   }
@@ -51,8 +52,16 @@ export class ExplorationCamera {
     this.impulse = Math.min(1.4, this.impulse + strength);
   }
 
+  toggleSide() {
+    this.side = this.side === 1 ? -1 : 1;
+  }
+
   private viewFor(zoom: number) {
-    if (this.override && zoom === 0) return this.override;
+    if (this.override && (zoom === 0 || this.override.zoomScale)) {
+      const scale = this.override.zoomScale?.[zoom] ?? 1;
+      const heightScale = this.override.zoomHeightScale?.[zoom] ?? scale;
+      return { ...this.override, height: this.override.height * heightScale, distance: this.override.distance * scale };
+    }
     return VIEWS[zoom] ?? VIEWS[0];
   }
 
@@ -103,7 +112,7 @@ export class ExplorationCamera {
     this.desired.set(
       this.anchor.x + this.lead.x + offsetX,
       view.height + offsetY,
-      this.anchor.z + view.distance + this.lead.z,
+      this.anchor.z + this.side * view.distance + this.lead.z,
     );
     this.camera.position.lerp(this.desired, follow);
 

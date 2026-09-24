@@ -87,15 +87,20 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     const camera = new THREE.PerspectiveCamera(46, mount.clientWidth / mount.clientHeight, 0.1, 90);
     // Start at entrance near getabako
     const pos = new THREE.Vector3(-22, 0, 1.2);
-    const rig = new ExplorationCamera(camera, pos, zoomLevelRef.current, { height: 7.2, distance: 10.4, look: 0.7 });
+    const rig = new ExplorationCamera(camera, pos, zoomLevelRef.current, {
+      height: 3.55, distance: 7.8, look: 0.7,
+      zoomScale: [1, 0.68, 0.46], zoomHeightScale: [1, 0.9, 0.8],
+    });
 
     const keys: Record<string, boolean> = {};
     let character: ReturnType<typeof createGabrielaSprite> | null = null;
+    let povInverted = false;
     let disposed = false;
     preloadGabrielaSprite().then((texture) => {
       if (disposed) return;
       character = createGabrielaSprite(texture);
       character.sprite.position.set(pos.x, 0, pos.z);
+      character.sprite.scale.x = Math.abs(character.sprite.scale.x) * (povInverted ? -1 : 1);
       scene.add(character.sprite);
     });
 
@@ -154,6 +159,13 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       const key = e.key.toLowerCase();
       keys[key] = true;
       if (e.key.startsWith('Arrow')) e.preventDefault();
+      if (key === 'tab' && !e.repeat) {
+        e.preventDefault();
+        povInverted = !povInverted;
+        rig.toggleSide();
+        if (character) character.sprite.scale.x = Math.abs(character.sprite.scale.x) * (povInverted ? -1 : 1);
+        soundManager.playClockTick();
+      }
       if (key === 'e' && !e.repeat) talk();
       if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd') {
         e.preventDefault();
@@ -219,6 +231,10 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       if (dx && dz) {
         dx *= 0.7071;
         dz *= 0.7071;
+      }
+      if (povInverted) {
+        dx *= -1;
+        dz *= -1;
       }
       const b = school.bounds();
       const nx = THREE.MathUtils.clamp(pos.x + dx, b.minX, b.maxX);
@@ -434,6 +450,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
           +
         </button>
       </div>
+      <div className="absolute bottom-5 left-5 z-20 rounded-full border border-neutral-800/80 bg-black/55 px-3 py-2 font-serif-jp text-[9px] tracking-[0.16em] text-neutral-400 backdrop-blur-md"><kbd className="mr-2 text-neutral-200">TAB</kbd>INVERTER CÂMERA</div>
     </div>
   );
 };

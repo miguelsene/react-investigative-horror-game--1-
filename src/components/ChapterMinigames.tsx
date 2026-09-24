@@ -155,26 +155,26 @@ const BedMakingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   };
   const sheet = done.includes('sheet'); const pillows = done.includes('pillow'); const blanket = done.includes('blanket');
   return <div className="font-serif-jp">
-    <p className="mb-3 text-xs tracking-[0.2em] text-neutral-400">TOQUE NAS PARTES AMASSADAS PARA ARRUMAR</p>
+    <div className="mb-3 flex items-center justify-between text-[10px] tracking-[0.22em] text-neutral-400"><span>RITUAL DA MANHÃ</span><span>{done.length}/3</span></div>
     <div className="relative mx-auto aspect-[1.05/1] w-full max-w-[25rem] overflow-hidden rounded-xl border border-amber-900/60 bg-[radial-gradient(ellipse_at_center,#65503d_0%,#30251f_74%)] p-4 shadow-inner">
-      <svg viewBox="0 0 320 290" className="absolute inset-0 h-full w-full" role="img" aria-label="Ilustração da cama bagunçada de Gabriela">
-        <defs><linearGradient id="mattress" x2="0" y2="1"><stop stopColor="#eee8dc"/><stop offset="1" stopColor="#b7aa98"/></linearGradient><linearGradient id="quilt" x2="0" y2="1"><stop stopColor="#82464b"/><stop offset="1" stopColor="#492b38"/></linearGradient></defs>
-        <ellipse cx="161" cy="263" rx="129" ry="17" fill="#09090b" opacity=".45"/>
-        <rect x="34" y="19" width="252" height="37" rx="8" fill="#4c3024" stroke="#a47752" strokeWidth="5"/>
-        <path d="M49 49 Q160 32 271 49 L294 235 Q163 261 25 235 Z" fill="#684734" stroke="#2a1c17" strokeWidth="8"/>
-        <path d="M54 55 Q160 43 266 55 L281 225 Q161 243 39 225 Z" fill="url(#mattress)" stroke="#e8dece" strokeWidth="3"/>
-        <path d={sheet ? 'M55 104 Q160 99 265 104 L272 218 Q160 229 48 218 Z' : 'M55 105 Q93 89 124 114 Q156 94 181 119 Q219 94 266 109 L272 218 Q160 226 48 218 Z'} fill="#d9d8d2" stroke="#f7f1e6" strokeWidth="3" className="transition-all duration-500"/>
-        <path d={blanket ? 'M55 137 Q160 130 265 137 L272 216 Q160 226 48 216 Z' : 'M56 131 L113 143 L101 165 L166 149 L193 171 L267 137 L273 220 Q159 228 48 219 Z'} fill="url(#quilt)" stroke="#aa7375" strokeWidth="4" className="transition-all duration-500"/>
-        <path d={blanket ? 'M55 139 Q160 132 265 139' : 'M56 132 L111 144 L100 164 L165 148 L193 171 L267 137'} fill="none" stroke="#d8a9a2" strokeWidth="3" strokeDasharray="5 5"/>
-        <g className={`transition-all duration-500 ${pillows ? '' : ''}`}>
-          <rect x={pillows ? 74 : 61} y={pillows ? 65 : 71} width="76" height="37" rx="12" fill="#efe9df" stroke="#b7a99b" strokeWidth="3" transform={pillows ? 'rotate(-3 112 83)' : 'rotate(12 99 89)'}/>
-          <rect x={pillows ? 169 : 185} y={pillows ? 65 : 57} width="76" height="37" rx="12" fill="#e4dfd5" stroke="#b7a99b" strokeWidth="3" transform={pillows ? 'rotate(3 207 83)' : 'rotate(-17 223 75)'}/>
-        </g>
-        <path d="M72 190 Q99 181 122 195 M205 201 Q226 191 248 197" fill="none" stroke="#d59d98" strokeWidth="2" opacity=".7"/>
+      <svg viewBox="0 0 32 29" className="absolute inset-0 h-full w-full" role="img" aria-label="Sprite pixel art da cama de Gabriela" shapeRendering="crispEdges">
+        <rect x="2" y="3" width="28" height="23" fill="#392a2b"/>
+        <rect x="4" y="2" width="24" height="2" fill="#17171c"/><rect x="5" y="1" width="22" height="1" fill="#72505a"/>
+        <rect x="5" y="4" width="22" height="18" fill="#b7a68f"/><rect x="6" y="5" width="20" height="16" fill="#e1d5bd"/>
+        <rect x="3" y="21" width="26" height="2" fill="#704b3d"/><rect x="5" y="23" width="3" height="3" fill="#34231f"/><rect x="24" y="23" width="3" height="3" fill="#34231f"/>
+        <rect x="7" y="6" width="8" height="4" fill="#d9d4c8"/><rect x="17" y="6" width="8" height="4" fill="#d9d4c8"/>
+        {!pillows && <><rect x="6" y="6" width="4" height="1" fill="#a99c8e"/><rect x="13" y="8" width="2" height="1" fill="#aaa092"/><rect x="18" y="5" width="2" height="1" fill="#aaa092"/><rect x="22" y="9" width="4" height="1" fill="#a99c8e"/></>}
+        {pillows && <><rect x="8" y="6" width="6" height="1" fill="#fff0d6"/><rect x="18" y="6" width="6" height="1" fill="#fff0d6"/><rect x="9" y="8" width="4" height="1" fill="#c7bba8"/><rect x="19" y="8" width="4" height="1" fill="#c7bba8"/></>}
+        <rect x="6" y="10" width="20" height="10" fill={blanket ? '#70404d' : '#89515b'}/>
+        {!sheet && <><rect x="7" y="10" width="3" height="2" fill="#eee6d4"/><rect x="12" y="11" width="3" height="2" fill="#d7d0c2"/><rect x="18" y="10" width="3" height="2" fill="#f0e7d4"/><rect x="23" y="11" width="3" height="2" fill="#d7d0c2"/></>}
+        {!blanket && <><rect x="8" y="13" width="4" height="2" fill="#a36d72"/><rect x="15" y="12" width="3" height="3" fill="#513443"/><rect x="21" y="14" width="4" height="2" fill="#a36d72"/><rect x="11" y="17" width="5" height="1" fill="#392b38"/><rect x="19" y="18" width="4" height="1" fill="#392b38"/></>}
+        {blanket && <><rect x="8" y="12" width="16" height="1" fill="#c48b86"/><rect x="8" y="16" width="16" height="1" fill="#513443"/><rect x="10" y="13" width="1" height="3" fill="#d5a19a"/><rect x="15" y="13" width="1" height="3" fill="#d5a19a"/><rect x="20" y="13" width="1" height="3" fill="#d5a19a"/></>}
+        <rect x="5" y="20" width="22" height="1" fill="#382c34"/><rect x="10" y="24" width="12" height="1" fill="#1d1b20"/>
+        <rect x="2" y="27" width="5" height="1" fill="#a94b51"/><rect x="25" y="27" width="5" height="1" fill="#a94b51"/>
       </svg>
       {steps.map((step) => {
         const checked = done.includes(step.id);
-        return <button key={step.id} onClick={() => mark(step.id)} disabled={checked} className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-3 py-2 text-[10px] shadow-lg transition-all ${checked ? 'border-emerald-300 bg-emerald-950/85 text-emerald-200' : 'border-amber-200/80 bg-black/75 text-amber-50 hover:scale-105 hover:bg-amber-950'}`} style={{ left: step.x, top: step.y }} aria-label={step.label}>{checked ? '✓' : '✦'} <span className="ml-1">{checked ? 'Pronto' : step.label}</span></button>;
+        return <button key={step.id} onClick={() => mark(step.id)} disabled={checked} className={`absolute grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center border text-xs shadow-lg transition-all ${checked ? 'border-emerald-200/80 bg-emerald-950/80 text-emerald-100' : 'border-amber-100/80 bg-black/65 text-amber-50 hover:scale-110 hover:bg-amber-950/90'}`} style={{ left: step.x, top: step.y }} aria-label={step.label} title={step.label}>{checked ? '✓' : '✦'}</button>;
       })}
     </div>
     {done.length === steps.length && <div className="pt-4 text-right"><button onClick={onDone} className="inspection-action">Cama arrumada →</button></div>}
@@ -219,15 +219,15 @@ const BagPackingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const complete = packed.length === BAG.length;
   return <div className="grid gap-5 font-serif-jp md:grid-cols-[1.05fr_0.95fr]">
     <section>
-      <p className="mb-3 text-xs tracking-[0.2em] text-neutral-400">ITENS ESPALHADOS · {packed.length}/{BAG.length}</p>
+      <p className="mb-3 flex justify-between text-[10px] tracking-[0.2em] text-neutral-400"><span>PREPARO ESCOLAR</span><span>{packed.length}/{BAG.length}</span></p>
       <div className="relative min-h-[18rem] overflow-hidden rounded-xl border border-amber-900/60 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,.025)_0_2px,transparent_2px_34px),linear-gradient(145deg,#594332,#35271f_55%,#594333)] shadow-inner">
         <div className="absolute inset-x-0 top-3 text-center text-[9px] tracking-[0.3em] text-amber-100/40">QUARTO · ANTES DA AULA</div>
         {BAG.map((item, index) => {
           if (packed.includes(item.id)) return null;
           const [x, y] = ITEM_POSITIONS[index];
           return <button key={item.id} draggable onDragStart={(event) => { event.dataTransfer.setData('text/plain', item.id); event.dataTransfer.effectAllowed = 'move'; }} onClick={() => setSelected(item.id)}
-            className={`absolute flex min-w-14 -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[9px] text-amber-50 drop-shadow-[0_3px_3px_rgba(0,0,0,.9)] transition hover:scale-110 ${selected === item.id ? 'bg-amber-950/70 ring-1 ring-amber-200' : 'hover:bg-black/30'}`}
-            style={{ left: `${x}%`, top: `${y}%` }} aria-label={`Selecionar ${item.label}`}><PixelArtItem id={item.id} /><span className="whitespace-nowrap">{item.label}</span></button>;
+            className={`absolute grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-lg text-amber-50 drop-shadow-[0_3px_3px_rgba(0,0,0,.9)] transition hover:scale-110 ${selected === item.id ? 'bg-amber-950/75 ring-1 ring-amber-200' : 'hover:bg-black/30'}`}
+            style={{ left: `${x}%`, top: `${y}%` }} aria-label={`Selecionar ${item.label}`} title={item.label}><PixelArtItem id={item.id} size={46} /></button>;
         })}
       </div>
       <p className="mt-3 text-[10px] text-neutral-500">Arraste cada objeto até a mochila aberta ou selecione-o e clique na bolsa.</p>
@@ -236,13 +236,15 @@ const BagPackingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
       onKeyDown={(event) => { if (selected && (event.key === 'Enter' || event.key === ' ')) pack(selected); }} role="button" tabIndex={0} aria-label="Mochila aberta: solte aqui os itens selecionados"
       className={`relative flex min-h-[18rem] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border p-4 transition-colors ${hovering || selected ? 'border-amber-300 bg-amber-950/50' : 'border-amber-900/60 bg-[radial-gradient(ellipse_at_center,#70573e,#35271f_72%)]'}`}>
       <div className="absolute inset-x-0 top-3 text-center text-[9px] tracking-[0.3em] text-amber-100/45">MOCHILA ABERTA NO CHÃO</div>
-      <svg viewBox="0 0 240 190" className="absolute inset-x-3 bottom-6 h-[78%] w-[calc(100%-1.5rem)] drop-shadow-[0_14px_14px_rgba(0,0,0,.65)]" aria-hidden="true" shapeRendering="crispEdges">
-        <path d="M52 49 Q24 68 29 142 L52 155 L67 78 M188 49 Q216 68 211 142 L188 155 L173 78" fill="#36251c" stroke="#1a1513" strokeWidth="7"/>
-        <path d="M66 59 Q120 40 174 59 L191 139 Q120 171 49 139 Z" fill="#775238" stroke="#d1a46f" strokeWidth="5"/>
-        <path d="M62 71 Q120 53 178 71 L183 125 Q120 148 57 125 Z" fill="#211b1b" stroke="#c28b56" strokeWidth="4"/>
-        <path d="M68 68 Q120 26 172 68 L164 91 Q120 77 76 91 Z" fill="#a9774e" stroke="#e0bb84" strokeWidth="4"/>
-        <path d="M74 91 Q120 79 166 91" fill="none" stroke="#f1d7a6" strokeWidth="3" strokeDasharray="4 4"/>
-        <path d="M87 134 Q120 147 153 134 L148 161 Q120 174 92 161 Z" fill="#563a2a" stroke="#bd905f" strokeWidth="4"/><rect x="105" y="153" width="30" height="8" rx="3" fill="#d5a052"/>
+      <svg viewBox="0 0 24 20" className="absolute inset-x-3 bottom-6 h-[78%] w-[calc(100%-1.5rem)] drop-shadow-[0_14px_14px_rgba(0,0,0,.65)]" aria-hidden="true" shapeRendering="crispEdges">
+        <rect x="2" y="6" width="2" height="10" fill="#201a1b"/><rect x="4" y="4" width="2" height="12" fill="#4a302c"/><rect x="18" y="4" width="2" height="12" fill="#4a302c"/><rect x="20" y="6" width="2" height="10" fill="#201a1b"/>
+        <rect x="5" y="3" width="14" height="2" fill="#17181d"/><rect x="4" y="5" width="16" height="10" fill="#7b493e"/><rect x="5" y="6" width="14" height="8" fill="#a7614e"/>
+        <rect x="6" y="6" width="12" height="7" fill="#322832"/><rect x="7" y="7" width="10" height="5" fill="#25232c"/>
+        <rect x="6" y="4" width="2" height="2" fill="#d9a36c"/><rect x="8" y="5" width="8" height="1" fill="#edc28a"/><rect x="16" y="4" width="2" height="2" fill="#d9a36c"/>
+        <rect x="8" y="2" width="8" height="2" fill="#9b6047"/><rect x="10" y="1" width="4" height="1" fill="#c17d59"/>
+        <rect x="7" y="13" width="10" height="3" fill="#684037"/><rect x="8" y="14" width="8" height="1" fill="#d6a16a"/><rect x="10" y="13" width="4" height="2" fill="#d6a16a"/>
+        <rect x="10" y="7" width="4" height="3" fill="#be9a65"/><rect x="11" y="8" width="2" height="1" fill="#f1d7a6"/>
+        <rect x="8" y="16" width="2" height="2" fill="#36251f"/><rect x="14" y="16" width="2" height="2" fill="#36251f"/><rect x="3" y="17" width="18" height="1" fill="#17171c"/>
       </svg>
       <div className="absolute left-[33%] top-[43%] grid w-[34%] grid-cols-4 place-items-center gap-x-1 gap-y-0.5">
         {packed.map((id) => <span key={id} className="rounded bg-black/45 p-0.5" title={BAG.find((item) => item.id === id)?.label}><PixelArtItem id={id as (typeof BAG)[number]['id']} size={27}/></span>)}
@@ -412,7 +414,7 @@ export const ChapterMinigames: React.FC<Props> = ({ activity, onClose, onComplet
   }
 
   return (
-    <Panel title={TITLES[activity] ?? 'Atividade'} jp="日常" onClose={onClose} width="max-w-xl">
+    <Panel title={TITLES[activity] ?? 'Atividade'} jp="æ—¥å¸¸" onClose={onClose} width={activity === 'bed' || activity === 'bag' ? 'max-w-4xl' : 'max-w-xl'} surfaceClassName={activity === 'bed' || activity === 'bag' ? 'minigame-pixel-panel' : ''}>
       {body}
     </Panel>
   );
