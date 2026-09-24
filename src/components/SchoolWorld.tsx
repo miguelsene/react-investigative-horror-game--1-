@@ -67,10 +67,10 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     const school = buildSchool();
     // Do NOT cast/receive shadows per-mesh — too expensive with ~900 meshes and no shadow map
     scene.add(school.group);
-    // Eight ceiling lamps light the main school zones with one small shared pool.
-    // Their visible fixtures are built into the map; these provide the actual falloff.
-    [[-21, -12, 0xffe1b0], [-13, -12, 0xffdfaa], [5, -12, 0xe5f0ff], [13, -12, 0xffd9a0], [21, -12, 0xffe0ad], [-18, 0, 0xffddb0], [0, 0, 0xffddb0], [18, 0, 0xffddb0]].forEach(([x, z, color]) => {
-      const lamp = new THREE.PointLight(color as number, 0.5, 10, 2);
+    // Warm pools from the visible ceiling fixtures; no shadow maps, so the added
+    // falloff restores a visibly lit floor and walls at a modest rendering cost.
+    [[-21, -12, 0xffe1b0], [-13, -12, 0xffdfaa], [-4, -12, 0xffd8a0], [5, -12, 0xe5f0ff], [13, -12, 0xffd9a0], [21, -12, 0xffe0ad], [0, 0, 0xffddb0], [35, -2, 0xffddb0], [35, -13, 0xffe1b0]].forEach(([x, z, color]) => {
+      const lamp = new THREE.PointLight(color as number, 4.2, 12, 1.35);
       lamp.position.set(x as number, 3.68, z as number);
       scene.add(lamp);
     });

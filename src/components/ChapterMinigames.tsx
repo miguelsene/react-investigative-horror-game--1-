@@ -32,12 +32,6 @@ interface Props {
   onComplete: (result: MinigameResult) => void;
 }
 
-const CHECKLIST = [
-  { id: 'sheet', label: 'Esticar o lençol' },
-  { id: 'pillow', label: 'Ajeitar os travesseiros' },
-  { id: 'blanket', label: 'Dobrar o cobertor' },
-] as const;
-
 const DESK = [
   { id: 'books', label: 'Empilhar livros' },
   { id: 'papers', label: 'Alinhar papéis' },
@@ -148,10 +142,69 @@ const ChecklistGame: React.FC<{ items: readonly { id: string; label: string }[];
   );
 };
 
-const BAG_ICONS: Record<(typeof BAG)[number]['id'], string> = {
-  bio: '📗', math: '📐', chem: '🧪', phys: '📘', case: '🖊️', calc: '🔢',
-  wallet: '👛', phone: '📱', bottle: '🧴', umbrella: '☂️', keys: '🔑',
+const BedMakingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const [done, setDone] = useState<string[]>([]);
+  const steps = [
+    { id: 'sheet', label: 'Estique o lençol', x: '19%', y: '65%' },
+    { id: 'pillow', label: 'Ajeite os travesseiros', x: '76%', y: '24%' },
+    { id: 'blanket', label: 'Dobre o cobertor', x: '53%', y: '75%' },
+  ];
+  const mark = (id: string) => {
+    soundManager.playClockTick();
+    setDone((prev) => prev.includes(id) ? prev : [...prev, id]);
+  };
+  const sheet = done.includes('sheet'); const pillows = done.includes('pillow'); const blanket = done.includes('blanket');
+  return <div className="font-serif-jp">
+    <p className="mb-3 text-xs tracking-[0.2em] text-neutral-400">TOQUE NAS PARTES AMASSADAS PARA ARRUMAR</p>
+    <div className="relative mx-auto aspect-[1.05/1] w-full max-w-[25rem] overflow-hidden rounded-xl border border-amber-900/60 bg-[radial-gradient(ellipse_at_center,#65503d_0%,#30251f_74%)] p-4 shadow-inner">
+      <svg viewBox="0 0 320 290" className="absolute inset-0 h-full w-full" role="img" aria-label="Ilustração da cama bagunçada de Gabriela">
+        <defs><linearGradient id="mattress" x2="0" y2="1"><stop stopColor="#eee8dc"/><stop offset="1" stopColor="#b7aa98"/></linearGradient><linearGradient id="quilt" x2="0" y2="1"><stop stopColor="#82464b"/><stop offset="1" stopColor="#492b38"/></linearGradient></defs>
+        <ellipse cx="161" cy="263" rx="129" ry="17" fill="#09090b" opacity=".45"/>
+        <rect x="34" y="19" width="252" height="37" rx="8" fill="#4c3024" stroke="#a47752" strokeWidth="5"/>
+        <path d="M49 49 Q160 32 271 49 L294 235 Q163 261 25 235 Z" fill="#684734" stroke="#2a1c17" strokeWidth="8"/>
+        <path d="M54 55 Q160 43 266 55 L281 225 Q161 243 39 225 Z" fill="url(#mattress)" stroke="#e8dece" strokeWidth="3"/>
+        <path d={sheet ? 'M55 104 Q160 99 265 104 L272 218 Q160 229 48 218 Z' : 'M55 105 Q93 89 124 114 Q156 94 181 119 Q219 94 266 109 L272 218 Q160 226 48 218 Z'} fill="#d9d8d2" stroke="#f7f1e6" strokeWidth="3" className="transition-all duration-500"/>
+        <path d={blanket ? 'M55 137 Q160 130 265 137 L272 216 Q160 226 48 216 Z' : 'M56 131 L113 143 L101 165 L166 149 L193 171 L267 137 L273 220 Q159 228 48 219 Z'} fill="url(#quilt)" stroke="#aa7375" strokeWidth="4" className="transition-all duration-500"/>
+        <path d={blanket ? 'M55 139 Q160 132 265 139' : 'M56 132 L111 144 L100 164 L165 148 L193 171 L267 137'} fill="none" stroke="#d8a9a2" strokeWidth="3" strokeDasharray="5 5"/>
+        <g className={`transition-all duration-500 ${pillows ? '' : ''}`}>
+          <rect x={pillows ? 74 : 61} y={pillows ? 65 : 71} width="76" height="37" rx="12" fill="#efe9df" stroke="#b7a99b" strokeWidth="3" transform={pillows ? 'rotate(-3 112 83)' : 'rotate(12 99 89)'}/>
+          <rect x={pillows ? 169 : 185} y={pillows ? 65 : 57} width="76" height="37" rx="12" fill="#e4dfd5" stroke="#b7a99b" strokeWidth="3" transform={pillows ? 'rotate(3 207 83)' : 'rotate(-17 223 75)'}/>
+        </g>
+        <path d="M72 190 Q99 181 122 195 M205 201 Q226 191 248 197" fill="none" stroke="#d59d98" strokeWidth="2" opacity=".7"/>
+      </svg>
+      {steps.map((step) => {
+        const checked = done.includes(step.id);
+        return <button key={step.id} onClick={() => mark(step.id)} disabled={checked} className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border px-3 py-2 text-[10px] shadow-lg transition-all ${checked ? 'border-emerald-300 bg-emerald-950/85 text-emerald-200' : 'border-amber-200/80 bg-black/75 text-amber-50 hover:scale-105 hover:bg-amber-950'}`} style={{ left: step.x, top: step.y }} aria-label={step.label}>{checked ? '✓' : '✦'} <span className="ml-1">{checked ? 'Pronto' : step.label}</span></button>;
+      })}
+    </div>
+    {done.length === steps.length && <div className="pt-4 text-right"><button onClick={onDone} className="inspection-action">Cama arrumada →</button></div>}
+  </div>;
 };
+
+const PIXEL_ROWS: Record<(typeof BAG)[number]['id'], string[]> = {
+  bio: ['..AAAA..','.ABBBBA.','.ACCCBA.','.ACDDCA.','.ACCCBA.','.ACCCBA.','.ABBBBA.','..AAAA..'],
+  math: ['...AA...','..ABA...','.ABBA...','ABBBBBA.','ACCCCBBA','ABDDDDA.','.AAAAAA.','..AAAA..'],
+  chem: ['..AA..AA','..AA..AA','...AAAA.','..ACCCA.','.ACCCCA.','.ACDDCA.','..ABBA..','...AA...'],
+  phys: ['.AAAAAA.','.ABBBBBA','.ACCCBBA','.ACDDBBA','.ACCCBBA','.ABBBBBA','.AAAAAAA','..AAAA..'],
+  case: ['........','AAAAAAA.','ABBBBBBA','ACCCCCCA','ACDDDDCA','ACCCCCCA','ABBBBBBA','AAAAAAAA'],
+  calc: ['.AAAAAA.','.ABBBBBA','.ACCCBBA','.ACDDCBA','.ACCCBBA','.ABDBBBA','.ACCCBBA','.AAAAAAA'],
+  wallet: ['..AAAA..','.ABBBBA.','ABCCCCBA','ACDDDDCA','ACCCCCCA','ABBBBBBA','.AAAAAA.','..AAAA..'],
+  phone: ['..AAAA..','.ABBBBA.','.ACCCCA.','.ACDDCA.','.ACDDCA.','.ACCCCA.','.ABBBBA.','..AAAA..'],
+  bottle: ['...AA...','..ABBA..','..ACCA..','.ACCCCA.','.ACDDCA.','.ACCCCA.','.ABBBBA.','..AAAA..'],
+  umbrella: ['..AAAA..','.ABBBBA.','ACCCCCCA','ACCCCCCA','..ACCA..','..ACCA..','...ACA..','....A...'],
+  keys: ['..AAAA..','.ABBBBA.','.ACCCCA.','..AA.AA.','...A.AA.','...AAAA.','.....AA.','.....AA.'],
+};
+const PixelArtItem: React.FC<{ id: (typeof BAG)[number]['id']; size?: number }> = ({ id, size = 42 }) => {
+  const palettes: Record<string, Record<string, string>> = {
+    bio: { A: '#171820', B: '#547a91', C: '#e4d2a9', D: '#394657' }, math: { A: '#171820', B: '#d2bd85', C: '#f0e9d5', D: '#7894aa' },
+    chem: { A: '#171820', B: '#738f72', C: '#b4d39b', D: '#45604d' }, phys: { A: '#171820', B: '#6d688f', C: '#e6d8c3', D: '#413c60' },
+    case: { A: '#171820', B: '#8d5b4a', C: '#dda46a', D: '#503432' }, calc: { A: '#171820', B: '#666c75', C: '#7bc5b0', D: '#303944' },
+    wallet: { A: '#171820', B: '#9c5945', C: '#d8a465', D: '#60392d' }, phone: { A: '#171820', B: '#353b4e', C: '#76c2bd', D: '#222632' },
+    bottle: { A: '#171820', B: '#54806a', C: '#b0d4a0', D: '#324c40' }, umbrella: { A: '#171820', B: '#59628f', C: '#c7a7a4', D: '#373e65' }, keys: { A: '#171820', B: '#c29a50', C: '#f0d486', D: '#77592d' },
+  };
+  return <svg width={size} height={size} viewBox="0 0 8 8" shapeRendering="crispEdges" aria-hidden="true">{PIXEL_ROWS[id].flatMap((row, y) => [...row].map((pixel, x) => pixel === '.' ? null : <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill={palettes[id][pixel]} />))}</svg>;
+};
+const ITEM_POSITIONS = [[6,9],[27,12],[51,8],[77,13],[14,40],[39,36],[65,41],[88,38],[9,69],[38,70],[72,68]] as const;
 
 const BagPackingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const [packed, setPacked] = useState<string[]>([]);
@@ -160,51 +213,45 @@ const BagPackingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
   const packedRef = useRef(new Set<string>());
   const pack = (id: string) => {
     if (!BAG.some((item) => item.id === id) || packedRef.current.has(id)) return;
-    packedRef.current.add(id);
-    soundManager.playClockTick();
-    setPacked((items) => [...items, id]);
-    setSelected(null);
+    packedRef.current.add(id); soundManager.playClockTick(); setPacked((items) => [...items, id]); setSelected(null);
   };
-  const drop = (event: React.DragEvent) => {
-    event.preventDefault();
-    setHovering(false);
-    pack(event.dataTransfer.getData('text/plain'));
-  };
+  const drop = (event: React.DragEvent) => { event.preventDefault(); setHovering(false); pack(event.dataTransfer.getData('text/plain')); };
   const complete = packed.length === BAG.length;
-  return <div className="grid gap-5 md:grid-cols-[1fr_0.9fr] font-serif-jp">
+  return <div className="grid gap-5 font-serif-jp md:grid-cols-[1.05fr_0.95fr]">
     <section>
-      <p className="mb-3 text-xs tracking-widest text-neutral-400">ITENS PARA LEVAR · {packed.length}/{BAG.length}</p>
-      <div className="grid grid-cols-2 gap-2">
-        {BAG.map((item) => {
-          const isPacked = packed.includes(item.id);
-          return <button key={item.id} draggable={!isPacked}
-            onDragStart={(event) => { event.dataTransfer.setData('text/plain', item.id); event.dataTransfer.effectAllowed = 'move'; }}
-            onClick={() => !isPacked && setSelected(item.id)}
-            className={`flex items-center gap-2 border px-3 py-2 text-left text-xs transition ${isPacked ? 'border-emerald-900/50 text-neutral-600 opacity-50' : selected === item.id ? 'border-amber-300 bg-amber-950/40 text-white' : 'border-neutral-700 bg-neutral-900/70 text-neutral-200 hover:border-neutral-400'}`}>
-            <span className="text-lg">{BAG_ICONS[item.id]}</span><span>{item.label}</span>{isPacked && <span className="ml-auto text-emerald-400">✓</span>}
-          </button>;
+      <p className="mb-3 text-xs tracking-[0.2em] text-neutral-400">ITENS ESPALHADOS · {packed.length}/{BAG.length}</p>
+      <div className="relative min-h-[18rem] overflow-hidden rounded-xl border border-amber-900/60 bg-[repeating-linear-gradient(90deg,rgba(255,255,255,.025)_0_2px,transparent_2px_34px),linear-gradient(145deg,#594332,#35271f_55%,#594333)] shadow-inner">
+        <div className="absolute inset-x-0 top-3 text-center text-[9px] tracking-[0.3em] text-amber-100/40">QUARTO · ANTES DA AULA</div>
+        {BAG.map((item, index) => {
+          if (packed.includes(item.id)) return null;
+          const [x, y] = ITEM_POSITIONS[index];
+          return <button key={item.id} draggable onDragStart={(event) => { event.dataTransfer.setData('text/plain', item.id); event.dataTransfer.effectAllowed = 'move'; }} onClick={() => setSelected(item.id)}
+            className={`absolute flex min-w-14 -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded-lg px-2 py-1 text-[9px] text-amber-50 drop-shadow-[0_3px_3px_rgba(0,0,0,.9)] transition hover:scale-110 ${selected === item.id ? 'bg-amber-950/70 ring-1 ring-amber-200' : 'hover:bg-black/30'}`}
+            style={{ left: `${x}%`, top: `${y}%` }} aria-label={`Selecionar ${item.label}`}><PixelArtItem id={item.id} /><span className="whitespace-nowrap">{item.label}</span></button>;
         })}
       </div>
-      <p className="mt-3 text-[10px] text-neutral-500">Arraste os itens até a mochila ou selecione um item e clique nela.</p>
+      <p className="mt-3 text-[10px] text-neutral-500">Arraste cada objeto até a mochila aberta ou selecione-o e clique na bolsa.</p>
     </section>
-    <section onDragOver={(event) => { event.preventDefault(); setHovering(true); }} onDragLeave={() => setHovering(false)} onDrop={drop}
-      onClick={() => selected && pack(selected)} onKeyDown={(event) => { if (selected && (event.key === 'Enter' || event.key === ' ')) pack(selected); }}
-      role="button" tabIndex={0} aria-label="Mochila: solte aqui os itens selecionados"
-      className={`relative flex min-h-64 cursor-pointer flex-col items-center justify-center overflow-hidden border-2 p-4 transition-colors ${hovering || selected ? 'border-amber-300 bg-amber-950/25' : 'border-dashed border-neutral-600 bg-neutral-900/40'}`}>
-      <div className="absolute top-5 h-8 w-16 rounded-t-2xl border-2 border-neutral-500" />
-      <div className="mt-8 flex h-36 w-40 flex-col items-center rounded-[2.5rem_2.5rem_1.2rem_1.2rem] border-2 border-amber-800/80 bg-gradient-to-br from-amber-950 to-neutral-950 p-3 shadow-[inset_0_0_28px_rgba(180,110,45,.12),0_12px_32px_rgba(0,0,0,.45)]">
-        <div className="mb-2 h-3 w-12 rounded-full border border-amber-700/70" />
-        <div className="grid w-full flex-1 grid-cols-4 content-center gap-1 rounded-lg border border-amber-900/60 bg-black/25 p-2">
-          {packed.map((id) => <span key={id} className="text-center text-xl" title={BAG.find((item) => item.id === id)?.label}>{BAG_ICONS[id as (typeof BAG)[number]['id']]}</span>)}
-          {Array.from({ length: BAG.length - packed.length }, (_, i) => <span key={`empty-${i}`} className="grid h-7 place-items-center text-xs text-amber-100/20">·</span>)}
-        </div>
+    <section onDragOver={(event) => { event.preventDefault(); setHovering(true); }} onDragLeave={() => setHovering(false)} onDrop={drop} onClick={() => selected && pack(selected)}
+      onKeyDown={(event) => { if (selected && (event.key === 'Enter' || event.key === ' ')) pack(selected); }} role="button" tabIndex={0} aria-label="Mochila aberta: solte aqui os itens selecionados"
+      className={`relative flex min-h-[18rem] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border p-4 transition-colors ${hovering || selected ? 'border-amber-300 bg-amber-950/50' : 'border-amber-900/60 bg-[radial-gradient(ellipse_at_center,#70573e,#35271f_72%)]'}`}>
+      <div className="absolute inset-x-0 top-3 text-center text-[9px] tracking-[0.3em] text-amber-100/45">MOCHILA ABERTA NO CHÃO</div>
+      <svg viewBox="0 0 240 190" className="absolute inset-x-3 bottom-6 h-[78%] w-[calc(100%-1.5rem)] drop-shadow-[0_14px_14px_rgba(0,0,0,.65)]" aria-hidden="true" shapeRendering="crispEdges">
+        <path d="M52 49 Q24 68 29 142 L52 155 L67 78 M188 49 Q216 68 211 142 L188 155 L173 78" fill="#36251c" stroke="#1a1513" strokeWidth="7"/>
+        <path d="M66 59 Q120 40 174 59 L191 139 Q120 171 49 139 Z" fill="#775238" stroke="#d1a46f" strokeWidth="5"/>
+        <path d="M62 71 Q120 53 178 71 L183 125 Q120 148 57 125 Z" fill="#211b1b" stroke="#c28b56" strokeWidth="4"/>
+        <path d="M68 68 Q120 26 172 68 L164 91 Q120 77 76 91 Z" fill="#a9774e" stroke="#e0bb84" strokeWidth="4"/>
+        <path d="M74 91 Q120 79 166 91" fill="none" stroke="#f1d7a6" strokeWidth="3" strokeDasharray="4 4"/>
+        <path d="M87 134 Q120 147 153 134 L148 161 Q120 174 92 161 Z" fill="#563a2a" stroke="#bd905f" strokeWidth="4"/><rect x="105" y="153" width="30" height="8" rx="3" fill="#d5a052"/>
+      </svg>
+      <div className="absolute left-[33%] top-[43%] grid w-[34%] grid-cols-4 place-items-center gap-x-1 gap-y-0.5">
+        {packed.map((id) => <span key={id} className="rounded bg-black/45 p-0.5" title={BAG.find((item) => item.id === id)?.label}><PixelArtItem id={id as (typeof BAG)[number]['id']} size={27}/></span>)}
       </div>
       <p className="mt-4 text-xs tracking-widest text-amber-100/80">{complete ? 'MOCHILA PRONTA' : 'SOLTE OS ITENS AQUI'}</p>
     </section>
     {complete && <div className="md:col-span-2 text-right"><button onClick={onDone} className="inspection-action">Fechar a mochila e descer →</button></div>}
   </div>;
 };
-
 const QuizResult: React.FC<{ subject: string; score: number; total: number; onDone: (score: number, total: number) => void }> = ({ score, total, onDone }) => {
   const grade = gradeForScore(score, total);
   const tone =
@@ -338,7 +385,7 @@ export const ChapterMinigames: React.FC<Props> = ({ activity, onClose, onComplet
   };
 
   let body: React.ReactNode = null;
-  if (activity === 'bed') body = <ChecklistGame items={CHECKLIST} successLine="Pronto." onDone={() => finish('A cama está arrumada.')} />;
+  if (activity === 'bed') body = <BedMakingGame onDone={() => finish('A cama está arrumada.')} />;
   if (activity === 'desk') body = <ChecklistGame items={DESK} successLine="Mesa organizada." onDone={() => finish('A escrivaninha está organizada.')} />;
   if (activity === 'bag') body = <BagPackingGame onDone={() => finish('A mochila está pronta.')} />;
   if (activity === 'uniform') body = <ChecklistGame items={[{ id: 'uniform', label: 'Trocar de roupa e dobrar o pijama' }]} successLine="Pronto." onDone={() => finish('Uniforme preparado.')} />;

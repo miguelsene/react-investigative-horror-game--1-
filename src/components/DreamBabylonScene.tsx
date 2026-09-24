@@ -6,8 +6,17 @@ import {
 
 interface Props { onComplete: () => void }
 const TOTAL = 6;
-const makeTone = () => 1.25 + Math.random() * 0.65;
 const SHEET = '/images/gabriela_sheet.png';
+type Cue = { x: number; y: number; id: number; duration: number };
+type Facing = 'down' | 'up' | 'left' | 'right';
+const spriteCell = (direction: Facing, frame: number, moving: boolean) => {
+  if (!moving) return direction === 'down' ? 0 : direction === 'up' ? 4 : 9;
+  const step = frame % 4;
+  if (direction === 'down') return [0, 1, 0, 2][step];
+  if (direction === 'up') return [4, 3, 4, 7][step];
+  return [9, 6, 9, 11][step];
+};
+const spriteMirror = (direction: Facing, cell: number) => direction === 'right' ? cell === 9 : direction === 'left' ? cell !== 9 : false;
 
 /** Babylon nightmare: the environments are 3D, while Gabriela and her copies use the game's 2D sprite. */
 export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
@@ -15,11 +24,40 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
   const [round, setRound] = useState(0);
   const [hits, setHits] = useState(0);
   const [misses, setMisses] = useState(0);
-  const [tone, setTone] = useState(makeTone);
+  const [cue, setCue] = useState<Cue | null>(null);
+  const [zoom, setZoom] = useState(21);
   const [phase, setPhase] = useState<'playing' | 'failed' | 'complete'>('playing');
-  const stateRef = useRef({ round, hits, misses, tone, phase });
-  stateRef.current = { round, hits, misses, tone, phase };
+  const stateRef = useRef({ round, hits, misses, cue, phase });
+  stateRef.current = { round, hits, misses, cue, phase };
   const lastStrikeRef = useRef(0);
+  const resolveRef = useRef<(success: boolean) => void>(() => {});
+  const cameraRef = useRef<ArcRotateCamera | null>(null);
+  useEffect(() => { if (cameraRef.current) cameraRef.current.radius = zoom; }, [zoom]);
+  const resolveCue = React.useCallback((success: boolean) => {
+    const s = stateRef.current;
+    if (s.phase !== 'playing' || !s.cue) return;
+    const nextHits = s.hits + Number(success);
+    const nextMisses = s.misses + Number(!success);
+    const nextRound = s.round + 1;
+    stateRef.current = { ...s, hits: nextHits, misses: nextMisses, round: nextRound, cue: null };
+    setHits(nextHits); setMisses(nextMisses); setRound(nextRound); setCue(null);
+    if (nextMisses >= 4) { stateRef.current.phase = 'failed'; setPhase('failed'); }
+    else if (nextRound >= TOTAL) { stateRef.current.phase = 'complete'; setPhase('complete'); }
+  }, []);
+  resolveRef.current = resolveCue;
+
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    let openTimer = 0; let expireTimer = 0;
+    openTimer = window.setTimeout(() => {
+      if (stateRef.current.phase !== 'playing') return;
+      const duration = 600 + Math.random() * 700;
+      const nextCue = { x: 12 + Math.random() * 76, y: 19 + Math.random() * 62, id: performance.now(), duration };
+      stateRef.current.cue = nextCue; setCue(nextCue);
+      expireTimer = window.setTimeout(() => resolveRef.current(false), duration);
+    }, 800 + Math.random() * 1250);
+    return () => { window.clearTimeout(openTimer); window.clearTimeout(expireTimer); };
+  }, [phase, round]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,12 +68,34 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
     const scene = new Scene(engine);
     scene.clearColor = new Color4(0.95, 0.97, 0.99, 1);
     const camera = new ArcRotateCamera('dream-camera', -Math.PI / 2, 1.05, 21, new Vector3(0, 0.8, 0), scene);
-    camera.lowerRadiusLimit = 21; camera.upperRadiusLimit = 21; camera.inputs.clear();
+    cameraRef.current = camera;
+    camera.lowerRadiusLimit = 8; camera.upperRadiusLimit = 30; camera.radius = stateRef.current.phase === 'playing' ? 21 : 21; camera.inputs.clear();
     new HemisphericLight('white-room-light', new Vector3(0.2, 1, -0.2), scene).intensity = 1.1;
     const floor = MeshBuilder.CreateGround('endless-white-floor', { width: 80, height: 80 }, scene);
     const floorMat = new StandardMaterial('floor-white', scene); floorMat.diffuseColor = new Color3(0.98, 0.985, 0.99); floorMat.specularColor = Color3.Black(); floor.material = floorMat;
 
+    scene.fogMode = Scene.FOGMODE_EXP2; scene.fogColor = new Color3(0.98, 0.985, 0.995); scene.fogDensity = 0.012;
     const heroPos = new Vector3(0, 0, 0);
+    let spriteImage: HTMLImageElement | null = null;
+    const drawSpriteFrame = (texture: DynamicTexture, cell: number, black: boolean, mirror: boolean) => {
+      if (!spriteImage) return;
+      const sourceW = spriteImage.naturalWidth * 0.13;
+      const sourceH = spriteImage.naturalHeight * (0.97 / 3);
+      const width = Math.max(1, Math.round(sourceW)); const height = Math.max(1, Math.round(sourceH));
+      if (texture.getSize().width !== width || texture.getSize().height !== height) texture.scaleTo(width, height);
+      const ctx = texture.getContext(); ctx.clearRect(0, 0, width, height);
+      if (mirror) { ctx.save(); ctx.translate(width, 0); ctx.scale(-1, 1); }
+      const col = cell % 4; const row = Math.floor(cell / 4);
+      ctx.drawImage(spriteImage, (col + 0.24) / 4 * spriteImage.naturalWidth, (row + 0.015) / 3 * spriteImage.naturalHeight,
+        sourceW, sourceH, 0, 0, width, height);
+      if (mirror) ctx.restore();
+      const pixels = ctx.getImageData(0, 0, width, height);
+      for (let i = 0; i < pixels.data.length; i += 4) {
+        if (Math.min(pixels.data[i], pixels.data[i + 1], pixels.data[i + 2]) > 218) pixels.data[i + 3] = 0;
+        if (black && pixels.data[i + 3] > 0) pixels.data[i] = pixels.data[i + 1] = pixels.data[i + 2] = 0;
+      }
+      ctx.putImageData(pixels, 0, 0); texture.hasAlpha = true; texture.update(true);
+    };
     const makeSprite = (name: string, texture: DynamicTexture, black: boolean, pos: Vector3): Mesh => {
       const plane = MeshBuilder.CreatePlane(name, { width: 1.8, height: 3.0 }, scene);
       plane.position.copyFrom(pos); plane.position.y = 1.12; plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
@@ -48,31 +108,23 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
       return plane;
     };
     const playerTexture = new DynamicTexture('gabriela-sprite', { width: 1, height: 1 }, scene, false);
-    const shadowTexture = new DynamicTexture('shadow-sprite', { width: 1, height: 1 }, scene, false);
     const player = makeSprite('gabriela-player', playerTexture, false, heroPos);
+    const copyTextures: DynamicTexture[] = [];
     const copies = Array.from({ length: TOTAL }, (_, i) => {
       const angle = i / TOTAL * Math.PI * 2;
-      return makeSprite(`shadow-copy-${i + 1}`, shadowTexture, true, new Vector3(Math.cos(angle) * 8, 1.12, Math.sin(angle) * 8));
+      const texture = new DynamicTexture(`shadow-sprite-${i}`, { width: 1, height: 1 }, scene, false);
+      copyTextures.push(texture);
+      return makeSprite(`shadow-copy-${i + 1}`, texture, true, new Vector3(Math.cos(angle) * 11, 1.12, Math.sin(angle) * 11));
     });
-    const sheetTextureFor = (texture: DynamicTexture, image: HTMLImageElement, shadow: boolean) => {
-      const c = document.createElement('canvas'); c.width = image.naturalWidth; c.height = image.naturalHeight;
-      const ctx = c.getContext('2d', { willReadFrequently: true });
-      if (!ctx) return;
-      ctx.drawImage(image, 0, 0);
-      const pixels = ctx.getImageData(0, 0, c.width, c.height);
-      for (let i = 0; i < pixels.data.length; i += 4) {
-        const white = Math.min(pixels.data[i], pixels.data[i + 1], pixels.data[i + 2]);
-        if (white > 218) pixels.data[i + 3] = 0;
-        else if (shadow) { pixels.data[i] = 0; pixels.data[i + 1] = 0; pixels.data[i + 2] = 0; }
-      }
-      ctx.putImageData(pixels, 0, 0);
-      texture.scaleTo(c.width, c.height);
-      texture.getContext().drawImage(c, 0, 0); texture.update(true);
-      texture.hasAlpha = true; texture.wrapU = texture.wrapV = 0; texture.anisotropicFilteringLevel = 1;
-      texture.updateSamplingMode(2);
-    };
+    let lastHeroCell = '';
+    const lastCopyCell = Array(TOTAL).fill('');
     const image = new Image(); image.src = SHEET;
-    image.onload = () => { sheetTextureFor(playerTexture, image, false); sheetTextureFor(shadowTexture, image, true); };
+    image.onload = () => {
+      spriteImage = image;
+      [playerTexture, ...copyTextures].forEach((texture) => { texture.wrapU = texture.wrapV = 0; texture.anisotropicFilteringLevel = 1; texture.updateSamplingMode(1); });
+      drawSpriteFrame(playerTexture, 0, false, false);
+      copyTextures.forEach((texture) => drawSpriteFrame(texture, 9, true, false));
+    };
 
     const anomalyMats = [0xf3a6ff, 0x97e8ff].map((color, i) => {
       const material = new StandardMaterial(`dream-anomaly-glow-${i}`, scene);
@@ -91,66 +143,88 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete }) => {
     });
 
     const keys = new Set<string>();
-    const down = (e: KeyboardEvent) => { const key = e.key.toLowerCase(); if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { e.preventDefault(); keys.add(key); } };
+    const down = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key === '+' || key === '=') { e.preventDefault(); setZoom((v) => Math.max(8, v - 2)); }
+      else if (key === '-' || key === '_') { e.preventDefault(); setZoom((v) => Math.min(30, v + 2)); }
+      else if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)) { e.preventDefault(); keys.add(key); }
+    };
     const up = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
+    const wheel = (e: WheelEvent) => { e.preventDefault(); setZoom((v) => Math.max(8, Math.min(30, v + Math.sign(e.deltaY) * 1.5))); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
+    canvas.addEventListener('wheel', wheel, { passive: false });
     let elapsed = 0;
     engine.runRenderLoop(() => {
       const dt = Math.min(engine.getDeltaTime() / 1000, 0.05); elapsed += dt;
       const s = stateRef.current;
       camera.target.copyFromFloats(heroPos.x, 0.8, heroPos.z);
-      scene.clearColor = s.phase === 'playing' ? new Color4(0.95 - s.round * 0.02, 0.97 - s.round * 0.02, 0.99 - s.round * 0.015, 1) : new Color4(0.002, 0.003, 0.006, 1);
+      scene.clearColor = s.phase === 'playing' ? new Color4(0.97 - s.misses * 0.055, 0.975 - s.misses * 0.07, 0.99 - s.misses * 0.055, 1) : new Color4(0.002, 0.003, 0.006, 1);
+      scene.fogDensity = 0.012 + s.misses * 0.008;
       const dx = Number(keys.has('d') || keys.has('arrowright')) - Number(keys.has('a') || keys.has('arrowleft'));
       const dz = Number(keys.has('s') || keys.has('arrowdown')) - Number(keys.has('w') || keys.has('arrowup'));
       const len = Math.hypot(dx, dz) || 1;
-      heroPos.x = Math.max(-5.7, Math.min(5.7, heroPos.x + dx / len * dt * 3.5));
-      heroPos.z = Math.max(-5.2, Math.min(5.2, heroPos.z + dz / len * dt * 3.5));
+      heroPos.x = Math.max(-9, Math.min(9, heroPos.x + dx / len * dt * (3.8 + s.misses * 0.25)));
+      heroPos.z = Math.max(-8, Math.min(8, heroPos.z + dz / len * dt * (3.8 + s.misses * 0.25)));
       player.position.x = heroPos.x; player.position.z = heroPos.z;
       player.position.y = 1.12 + Math.abs(Math.sin(elapsed * 9)) * (dx || dz ? 0.12 : 0.025);
       player.rotation.z = dx ? Math.sign(dx) * Math.sin(elapsed * 10) * 0.035 : 0;
-      const row = dz < -0.1 ? 1 : dz > 0.1 ? 0 : 2;
-      const col = dx < -0.1 ? 1 : dx > 0.1 ? 2 : Math.floor(elapsed * 3) % 2;
-      const playerMat = player.material as StandardMaterial;
-      const playerTex = playerMat.diffuseTexture as DynamicTexture;
-      playerTex.uScale = 0.25; playerTex.vScale = 1 / 3; playerTex.uOffset = col * 0.25; playerTex.vOffset = 1 - (row + 1) / 3;
-      const chaseBoost = 1 + s.misses * 0.35;
+      const playerMoving = Boolean(dx || dz);
+      const playerFacing: Facing = Math.abs(dx) > Math.abs(dz) ? (dx < 0 ? 'left' : 'right') : dz < 0 ? 'up' : 'down';
+      const playerFrame = Math.floor(elapsed * 9) % 4;
+      const playerCell = spriteCell(playerFacing, playerFrame, playerMoving);
+      const heroKey = `${playerCell}:${spriteMirror(playerFacing, playerCell)}`;
+      if (spriteImage && heroKey !== lastHeroCell) { drawSpriteFrame(playerTexture, playerCell, false, spriteMirror(playerFacing, playerCell)); lastHeroCell = heroKey; }
+      const chaseBoost = 1 + s.misses * 0.24;
       copies.forEach((copy, i) => {
         anomalies[i].setEnabled(i >= s.hits && s.phase === 'playing');
         const vx = heroPos.x - copy.position.x; const vz = heroPos.z - copy.position.z;
         const distance = Math.hypot(vx, vz) || 1;
-        const speed = (0.23 + s.misses * 0.21) * chaseBoost;
+        const speed = (0.28 + s.misses * 0.34) * chaseBoost;
         copy.position.x += vx / distance * Math.min(distance, dt * speed);
         copy.position.z += vz / distance * Math.min(distance, dt * speed);
         copy.position.y = 1.12 + Math.abs(Math.sin(elapsed * 8 + i)) * 0.1;
-        copy.rotation.z = Math.sin(elapsed * 4 + i) * 0.025;
-        const tex = (copy.material as StandardMaterial).diffuseTexture as DynamicTexture;
-        tex.uScale = 0.25; tex.vScale = 1 / 3; tex.uOffset = (Math.floor(elapsed * 3 + i) % 2) * 0.25; tex.vOffset = 1 - 1 / 3;
+        copy.rotation.z = Math.sin(elapsed * 9 + i) * 0.045;
+        const facing: Facing = Math.abs(vx) > Math.abs(vz) ? (vx < 0 ? 'left' : 'right') : vz < 0 ? 'up' : 'down';
+        const cell = spriteCell(facing, Math.floor(elapsed * 9 + i) % 4, true);
+        const mirror = spriteMirror(facing, cell);
+        const key = `${cell}:${mirror}`;
+        if (spriteImage && key !== lastCopyCell[i]) { drawSpriteFrame(copyTextures[i], cell, true, mirror); lastCopyCell[i] = key; }
+        copy.rotation.y = Math.sin(elapsed * 5 + i) * 0.05;
       });
+      camera.target.copyFromFloats(heroPos.x + Math.sin(elapsed * 31) * s.misses * 0.04, 0.8, heroPos.z + Math.cos(elapsed * 27) * s.misses * 0.04);
+      camera.fov = 0.8 + s.misses * 0.018;
       scene.render();
     });
     const resize = () => engine.resize(); window.addEventListener('resize', resize);
-    return () => { window.removeEventListener('resize', resize); window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); engine.stopRenderLoop(); scene.dispose(); engine.dispose(); };
+    return () => { cameraRef.current = null; window.removeEventListener('resize', resize); window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); canvas.removeEventListener('wheel', wheel); engine.stopRenderLoop(); scene.dispose(); engine.dispose(); };
   }, []);
 
-  useEffect(() => { if (phase !== 'playing') return; const id = window.setInterval(() => setTone(makeTone()), 500); return () => window.clearInterval(id); }, [round, phase]);
   const strike = () => {
     if (phase !== 'playing') return;
-    const now = performance.now(); if (now - lastStrikeRef.current < 500) return; lastStrikeRef.current = now;
-    const s = stateRef.current; const success = Math.abs(s.tone - 1.6) < 0.22;
-    const nextHits = s.hits + Number(success); const nextMisses = s.misses + Number(!success); const nextRound = s.round + 1;
-    setHits(nextHits); setMisses(nextMisses); setRound(nextRound);
-    if (nextMisses >= 4) setPhase('failed'); else if (nextRound >= TOTAL) setPhase('complete');
+    const now = performance.now(); if (now - lastStrikeRef.current < 180) return; lastStrikeRef.current = now;
+    resolveRef.current(true);
   };
-  const retry = () => { lastStrikeRef.current = 0; setRound(0); setHits(0); setMisses(0); setTone(makeTone()); setPhase('playing'); };
+  const retry = () => {
+    lastStrikeRef.current = 0;
+    stateRef.current = { round: 0, hits: 0, misses: 0, cue: null, phase: 'playing' };
+    setRound(0); setHits(0); setMisses(0); setCue(null); setPhase('playing'); setZoom(21);
+  };
   return <div className="fixed inset-0 z-[70] bg-black text-white">
     <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-label="Gabriela foge de cópias sombrias no espaço branco" />
-    <div aria-hidden="true" className="dream-warp-layer absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(ellipse at 18% 26%, rgba(255,110,225,.22), transparent 38%), radial-gradient(ellipse at 80% 74%, rgba(90,220,255,.2), transparent 42%), repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.025) 0 1px, transparent 2px 6px)' }} />
-    {phase === 'playing' && <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: `rgba(255,255,255,${0.025 + round * 0.045})` }}>
-      <div className="absolute left-1/2 top-7 -translate-x-1/2 rounded-sm border border-white/50 bg-black/55 px-5 py-3 text-center font-serif-jp text-sm tracking-wide text-white shadow-xl">WASD / setas: fuja. Cada acerto apaga uma anomalia. Clique quando o círculo fechar.</div>
-      <button onClick={strike} className="pointer-events-auto absolute bottom-24 right-10 grid h-32 w-32 place-items-center rounded-full border-2 border-white bg-black/35 shadow-[0_0_60px_rgba(255,255,255,.5)]" aria-label="Acertar o tempo">
-        <span className="absolute rounded-full border border-white/80 transition-all duration-500 ease-in-out" style={{ width: `${Math.max(25, tone * 42)}%`, height: `${Math.max(25, tone * 42)}%` }} /><span className="h-3 w-3 rounded-full bg-red-300 shadow-[0_0_20px_#fca5a5]" />
-      </button>
-      <div className="absolute bottom-12 right-7 font-serif-jp text-xs tracking-[0.3em]">ACERTOS {hits}/6 <span className="mx-3 text-red-300">ERROS {misses}/4</span></div>
+    <div aria-hidden="true" className="dream-warp-layer absolute inset-0 pointer-events-none" style={{ backgroundImage: `radial-gradient(ellipse at 18% 26%, rgba(255,55,85,${0.08 + misses * 0.07}), transparent 42%), radial-gradient(ellipse at 80% 74%, rgba(105,90,255,${0.08 + misses * 0.06}), transparent 45%), repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.04) 0 1px, transparent 2px 5px)`, mixBlendMode: 'screen', opacity: 0.45 + misses * 0.12 }} />
+    {phase === 'playing' && <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute left-1/2 top-7 -translate-x-1/2 rounded-sm border border-white/50 bg-black/65 px-5 py-3 text-center font-serif-jp text-sm tracking-wide text-white shadow-xl">WASD / setas: fuja. As marcas surgem por instantes; toque nelas antes que desapareçam.</div>
+      {cue && <button onClick={strike} className="pointer-events-auto absolute z-10 grid h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-red-100/90 bg-red-950/55 shadow-[0_0_42px_rgba(255,55,75,.9)] animate-pulse" style={{ left: `${cue.x}%`, top: `${cue.y}%` }} aria-label="Toque rápido: acerte o evento no tempo">
+        <span className="absolute inset-1 rounded-full border border-white/80" /><span className="h-2 w-2 rounded-full bg-white shadow-[0_0_14px_#fff]" />
+        <span className="absolute -bottom-2 left-1 right-1 h-1 overflow-hidden rounded bg-black/60"><span className="block h-full origin-left bg-red-200" style={{ animation: `dreamCueDrain ${cue.duration}ms linear forwards` }} /></span>
+      </button>}
+      {!cue && <div className="absolute left-1/2 top-1/2 -translate-x-1/2 rounded border border-white/20 bg-black/35 px-4 py-2 font-serif-jp text-[11px] tracking-[0.2em] text-white/60">NÃO OLHE PARA TRÁS</div>}
+      <div className="absolute bottom-7 right-7 flex items-center gap-2 rounded-full border border-white/30 bg-black/65 px-3 py-2 pointer-events-auto">
+        <button onClick={() => setZoom((v) => Math.min(30, v + 2))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Afastar zoom">−</button>
+        <span className="min-w-12 text-center font-mono text-[10px]">{(21 / zoom).toFixed(1)}×</span>
+        <button onClick={() => setZoom((v) => Math.max(8, v - 2))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Aproximar zoom">+</button>
+      </div>
+      <div className="absolute bottom-5 left-6 font-serif-jp text-xs tracking-[0.3em]">ACERTOS {hits}/6 <span className="mx-3 text-red-300">ERROS {misses}/4</span></div>
     </div>}
     {phase === 'failed' && <div className="absolute inset-0 grid place-items-center bg-black text-center"><div><p className="font-serif-jp text-sm tracking-[0.3em] text-neutral-400">TUDO FICA PRETO</p><p className="mt-3 text-2xl">As sombras alcançaram Gabriela.</p><button onClick={retry} className="mt-8 border border-neutral-500 px-6 py-3 font-serif-jp text-sm hover:bg-white hover:text-black">Tentar novamente</button></div></div>}
     {phase === 'complete' && <button onClick={onComplete} className="absolute inset-0 grid place-items-center bg-black text-center" aria-label="Continuar para o Capítulo 1"><span><span className="block font-serif-jp text-xs tracking-[0.5em] text-neutral-500">A MANHÃ DESAPARECE</span><span className="mt-5 block font-title text-4xl tracking-[0.25em]">CAPÍTULO 1</span><span className="mt-8 block font-serif-jp text-xs tracking-[0.3em] text-neutral-500">CLIQUE PARA CONTINUAR</span></span></button>}

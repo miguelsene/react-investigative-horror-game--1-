@@ -108,9 +108,9 @@ const shelfLoader = new GLTFLoader();
     
     // Shared wall materials — created once, reused across ALL tiledWall calls
     // This alone cuts ~60 MeshStandardMaterial allocations down to 3.
-    const wallCanvas = document.createElement('canvas');
-    wallCanvas.width = wallCanvas.height = 256;
-    const wallCtx = wallCanvas.getContext('2d')!;
+    const wallTileCanvas = document.createElement('canvas');
+    wallTileCanvas.width = wallTileCanvas.height = 256;
+    const wallCtx = wallTileCanvas.getContext('2d')!;
     wallCtx.fillStyle = '#e4e1d9'; wallCtx.fillRect(0, 0, 256, 256);
     for (let y = 0; y < 256; y += 64) for (let x = 0; x < 256; x += 64) {
       wallCtx.fillStyle = (x / 64 + y / 64) % 2 ? '#d9d7cf' : '#e9e6de';
@@ -118,7 +118,7 @@ const shelfLoader = new GLTFLoader();
       wallCtx.fillStyle = 'rgba(90,83,72,.16)'; wallCtx.fillRect(x, y, 64, 2); wallCtx.fillRect(x, y, 2, 64);
       wallCtx.fillStyle = 'rgba(255,255,255,.2)'; wallCtx.fillRect(x + 3, y + 3, 57, 2);
     }
-    const wallTexture = new THREE.CanvasTexture(wallCanvas);
+    const wallTexture = new THREE.CanvasTexture(wallTileCanvas);
     wallTexture.colorSpace = THREE.SRGBColorSpace;
     wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
     wallTexture.repeat.set(2, 1);
@@ -128,13 +128,28 @@ const shelfLoader = new GLTFLoader();
     const tiledWall = (w: number, h: number, x: number, z: number, ry = 0) => {
       const group = new THREE.Group();
       // Single face mesh — shared material, no individual grout strips (those were ~300 extra draw calls)
-      const face = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.16), _sharedTileMat);
+      const wallMaterial = _sharedTileMat.clone();
+      wallMaterial.depthWrite = false;
+      const revealUniforms = { center: { value: new THREE.Vector3() }, radius: { value: 0.9 }, enabled: { value: 0 } };
+      wallMaterial.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWallWorldPosition;');
+        shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWallWorldPosition = worldPosition.xyz;');
+        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWallWorldPosition;\nuniform vec3 uRevealCenter;\nuniform float uRevealRadius;\nuniform float uRevealEnabled;');
+        shader.fragmentShader = shader.fragmentShader.replace('#include <alphamap_fragment>', '#include <alphamap_fragment>\nfloat revealDistance = distance(vWallWorldPosition.xz, uRevealCenter.xz);\nfloat revealAlpha = smoothstep(uRevealRadius - 0.45, uRevealRadius + 0.9, revealDistance);\ndiffuseColor.a *= mix(1.0, revealAlpha, uRevealEnabled);');
+        (wallMaterial.userData as any).revealUniforms = shader.uniforms;
+        shader.uniforms.uRevealCenter = revealUniforms.center;
+        shader.uniforms.uRevealRadius = revealUniforms.radius;
+        shader.uniforms.uRevealEnabled = revealUniforms.enabled;
+      };
+      wallMaterial.customProgramCacheKey = () => 'school-wall-gradient-reveal-v1';
+      const face = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.16), wallMaterial);
       face.position.y = h / 2;
       group.add(face);
       occlusionTargets.push(face);
 
       // Baseboard — shared material
-      const baseboard = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.12, 0.2), _sharedBaseboardMat);
+      const baseboardMaterial = _sharedBaseboardMat.clone();
+      const baseboard = new THREE.Mesh(new THREE.BoxGeometry(w + 0.04, 0.12, 0.2), baseboardMaterial);
       baseboard.position.y = 0.06;
       group.add(baseboard);
 
@@ -142,7 +157,7 @@ const shelfLoader = new GLTFLoader();
       group.rotation.y = ry;
       root.add(group);
       occlusionWalls.push(group);
-      group.userData.fadeMaterials = [_sharedTileMat, _sharedBaseboardMat];
+      group.userData.fadeMaterials = [wallMaterial, baseboardMaterial];
       colliders.push(ry === 0
         ? { x, z, w, d: 0.16 }
         : { x, z, w: 0.16, d: w });
@@ -1211,6 +1226,8 @@ const shelfLoader = new GLTFLoader();
     festivalBanner(-10,  4,  3.72, 0.0);   // trecho central-oeste
     festivalBanner(  4, 14,  3.72, 0.0);   // trecho central-leste
     festivalBanner( 14, 26,  3.72, 0.0);   // trecho leste
+    festivalBanner( 29, 41,  3.58, -1.4);  // ala nova do refeitório
+    festivalBanner(-7,   5,  3.58,  2.8);   // pátio interno
 
     // Lanternas de papel do matsuri, agrupadas em instâncias para não pesar
     // como dezenas de objetos separados no corredor.
@@ -1445,7 +1462,12 @@ const shelfLoader = new GLTFLoader();
     const updateCameraOcclusion = (camera: THREE.Camera, player: THREE.Vector3, dt = 1 / 60) => {
       occlusionWalls.forEach((wall) => {
         const materials = wall.userData.fadeMaterials as THREE.MeshStandardMaterial[];
-        materials.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 1, 14, dt); });
+        materials.forEach((material) => {
+          material.opacity = THREE.MathUtils.damp(material.opacity, 1, 14, dt);
+          const uniforms = (material.userData as any).revealUniforms;
+          uniforms?.uRevealCenter?.value.copy(player);
+          if (uniforms?.uRevealEnabled) uniforms.uRevealEnabled.value = 0;
+        });
       });
       const direction = player.clone().sub(camera.position);
       const distance = direction.length();
@@ -1457,7 +1479,11 @@ const shelfLoader = new GLTFLoader();
         while (parent && !occlusionWalls.includes(parent as THREE.Group)) parent = parent.parent;
         if (parent) {
           const materials = (parent as THREE.Group).userData.fadeMaterials as THREE.MeshStandardMaterial[];
-          materials?.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 0.14, 18, dt); });
+          materials?.forEach((material) => {
+            material.opacity = THREE.MathUtils.damp(material.opacity, 1, 18, dt);
+            const uniforms = (material.userData as any).revealUniforms;
+            if (uniforms?.uRevealEnabled) uniforms.uRevealEnabled.value = 1;
+          });
         }
       }
     };
