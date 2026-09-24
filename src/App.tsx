@@ -19,6 +19,7 @@ import { ClockChecklist } from './components/ClockChecklist';
 import { HOUSE_CLOCKS } from './data/houseClocks';
 import { NeighborhoodWorld } from './components/NeighborhoodWorld';
 import { SchoolWorld } from './components/SchoolWorld';
+import { DreamBabylonScene } from './components/DreamBabylonScene';
 import { PhoneMap } from './components/PhoneMap';
 import { STREET, RETURN_MONOLOGUES } from './data/streetRoute';
 import type { Grade } from './components/ChapterMinigames';
@@ -41,12 +42,13 @@ export const App: React.FC = () => {
   const [isChapterSelectOpen, setIsChapterSelectOpen] = useState(false);
   const [caseCompletedOpen, setCaseCompletedOpen] = useState(false);
   const [isSecondNightCutscene, setIsSecondNightCutscene] = useState(false);
+  const [mapDissolving, setMapDissolving] = useState(false);
   const [activeDialogueNode, setActiveDialogueNode] = useState<DialogueNode | null>(null);
   const [activeMinigame, setActiveMinigame] = useState<ActivityId | null>(null);
   const [clockHuntOpen, setClockHuntOpen] = useState(false);
   const [foundClocks, setFoundClocks] = useState<string[]>([]);
   const [repairClockId, setRepairClockId] = useState<string | null>(null);
-  const [worldArea, setWorldArea] = useState<'house' | 'street' | 'school' | 'schoolhall' | 'return'>('house');
+  const [worldArea, setWorldArea] = useState<'house' | 'street' | 'school' | 'schoolhall' | 'return' | 'dream'>('house');
   const [routeProgress, setRouteProgress] = useState(0);
   const [grades, setGrades] = useState<Record<string, Grade>>({});
   const [isAreaLoading, setIsAreaLoading] = useState(false);
@@ -167,6 +169,8 @@ export const App: React.FC = () => {
       soundManager.transitionMusicFile('/musicas/trilha_home.mp3');
     } else if (activeScreen === 'gameplay' && (worldArea === 'school' || worldArea === 'schoolhall')) {
       soundManager.transitionMusicFile('/musicas/escola.mp3');
+    } else if (activeScreen === 'gameplay' && worldArea === 'dream') {
+      soundManager.stopMusic();
     } else {
       soundManager.stopMusic();
     }
@@ -232,7 +236,13 @@ export const App: React.FC = () => {
     // reset some story flags to provide a clean developer context
     gameState.setStoryFlags((p) => ({ ...p, developer_mode: true }));
     // Area mapping
-    if (area === 'house') {
+    if (area === 'morning_anomaly') {
+      setWorldArea('house');
+      gameState.setCurrentFloor(2);
+      gameState.setCurrentLocation('bedroom');
+      gameState.setStoryFlags((p) => ({ ...p, next_morning_anomaly: true, returned_from_school: true, dinner_done: true, activity_cooking: true, activity_bed: false, activity_bag: false, morning_talk: false, dream_scene_active: false }));
+      enterHouseArea();
+    } else if (area === 'house') {
       setWorldArea('house');
       gameState.setCurrentFloor(1);
       gameState.setCurrentLocation('living_room');
@@ -246,14 +256,19 @@ export const App: React.FC = () => {
       setWorldArea('school');
       gameState.setCurrentFloor(1);
       gameState.setCurrentLocation('school_entrance');
-    } else if (area === 'schoolhall') {
+    } else if (area === 'schoolhall' || area.startsWith('school_')) {
       setWorldArea('schoolhall');
       gameState.setCurrentFloor(1);
       gameState.setCurrentLocation('school_corridor');
+      const stage = area === 'school_nurse' ? 1 : area === 'school_computer' ? 2 : area === 'school_class' ? 3 : 0;
+      gameState.setStoryFlags((p) => ({ ...p, school_director_done: stage >= 1, school_nurse_done: stage >= 2, school_computer_done: stage >= 3 }));
     } else if (area === 'return') {
       setWorldArea('return');
       gameState.setCurrentFloor(1);
       gameState.setCurrentLocation('street_return');
+    } else if (area === 'dream') {
+      setWorldArea('dream');
+      gameState.setStoryFlags((p) => ({ ...p, returned_from_school: true, dinner_done: true, activity_cooking: true, arrived_school: false, left_house_for_school: false, dream_scene_active: true }));
     }
 
     // Time presets
@@ -261,13 +276,18 @@ export const App: React.FC = () => {
       gameState.setStoryFlags((p) => ({ ...p, morningStarted: true, breakfast_done: true }));
       gameState.setCurrentTime(customTime ?? '07:00');
     } else if (timePreset === 'school_morning') {
-      gameState.setStoryFlags((p) => ({ ...p, left_house_for_school: true }));
+      if (area !== 'dream') gameState.setStoryFlags((p) => ({ ...p, left_house_for_school: true }));
       gameState.setCurrentTime(customTime ?? '07:28');
     } else if (timePreset === 'school_dismissal') {
-      gameState.setStoryFlags((p) => ({ ...p, arrived_school: true }));
+      if (area !== 'dream') gameState.setStoryFlags((p) => ({ ...p, arrived_school: true }));
       gameState.setCurrentTime(customTime ?? '15:30');
     } else if (timePreset === 'night') {
-      gameState.setStoryFlags((p) => ({ ...p, returned_from_school: true }));
+      gameState.setStoryFlags((p) => ({ ...p, returned_from_school: true, activity_biology: true, activity_math: true, activity_chemistry: true, activity_physics: true, activity_cooking: true, dinner_done: true }));
+      if (area === 'house') {
+        gameState.setStoryFlags((p) => ({ ...p, arrived_school: false, left_house_for_school: false }));
+        gameState.setCurrentFloor(2);
+        gameState.setCurrentLocation('bedroom');
+      }
       gameState.setCurrentTime(customTime ?? '21:43');
     } else if (timePreset === 'custom') {
       if (customTime) gameState.setCurrentTime(customTime);
@@ -302,6 +322,12 @@ export const App: React.FC = () => {
   useEffect(() => {
     const fixed = HOUSE_CLOCKS.filter((clock) => Boolean(gameState.storyFlags[`clock_${clock.id}_fixed`])).map((clock) => clock.id);
     if (fixed.length > 0 && fixed.join('|') !== foundClocks.join('|')) setFoundClocks(fixed);
+
+    if (gameState.storyFlags.chapter_1_complete) return;
+    if (gameState.storyFlags.dream_scene_active) {
+      setWorldArea('dream');
+      return;
+    }
 
     const schoolFinished = ['biology', 'math', 'chemistry', 'physics'].every((subject) => Boolean(gameState.storyFlags[`activity_${subject}`]));
     if (gameState.storyFlags.arrived_school) {
@@ -366,6 +392,7 @@ export const App: React.FC = () => {
     if (!ateBreakfast || !has('activity_watson')) return '06:58';
     if (!clocksComplete) return '06:59';
     if (!homeReady) return '06:59';
+    if (f.returned_from_school) return f.dinner_done ? '21:43' : '18:07';
     if (worldArea === 'house') return '07:00';
     if (worldArea === 'street') return '07:28';
     if (!f.activity_biology || !f.activity_math || !f.activity_chemistry || !f.activity_physics) return '08:10';
@@ -374,6 +401,17 @@ export const App: React.FC = () => {
   }, [activeDialogueNode, ateBreakfast, clocksComplete, f, has, homeReady, talkedMorning, worldArea]);
 
   const currentObjective = useMemo(() => {
+    if (worldArea === 'schoolhall') {
+      if (!has('school_director_done')) return 'Missão: converse com a diretora na secretaria.';
+      if (!has('school_nurse_done')) return 'Missão: faça o exame de rotina na enfermaria.';
+      if (!has('school_computer_done')) return 'Missão: use o computador principal no laboratório.';
+      return nextSubject ? `Missão: vá à sala 2-B para a aula de ${SUBJECT_LABELS[nextSubject]}.` : 'Missão concluída. Saia pelo corredor.';
+    }
+    if (has('next_morning_anomaly') && worldArea === 'house') {
+      if (!has('activity_bed')) return 'Arrume a cama antes de descer.';
+      if (!has('activity_bag')) return 'Prepare a mochila e fale com a avó na cozinha.';
+      return 'Fale com a avó na cozinha.';
+    }
     if (!has('activity_bed') || !has('activity_bag')) return 'Arrume a cama e prepare a mochila antes de sair do quarto.';
     if (!talkedMorning) return 'Desça à cozinha e fale com a avó.';
     if (!ateBreakfast) return 'Sente-se à mesa e tome o café da manhã.';
@@ -385,9 +423,10 @@ export const App: React.FC = () => {
     if (!f.activity_math) return 'Complete a aula de Matemática.';
     if (!f.activity_chemistry) return 'Complete a aula de Química.';
     if (!f.activity_physics) return 'Complete a aula de Física.';
-    if (!f.activity_cooking) return 'Volte para casa e ajude no jantar.';
-    return 'Organize o material e descanse. O dia ainda não acabou.';
-  }, [ateBreakfast, clocksComplete, f, has, talkedMorning, worldArea]);
+    if (!f.activity_cooking) return worldArea === 'return' ? 'Volte para casa e ajude sua avó com o jantar.' : 'Ajude sua avó a preparar o jantar.';
+    if (!f.dinner_done) return 'Converse com sua avó durante o jantar.';
+    return 'Suba para o quarto e descanse com o gato ao lado da cama.';
+  }, [ateBreakfast, clocksComplete, f, has, talkedMorning, worldArea, nextSubject]);
 
   const dlg = useCallback((id: string) => () => setActiveDialogueNode(DIALOGUE_NODES[id]), []);
 
@@ -432,17 +471,24 @@ export const App: React.FC = () => {
       // ---------- 2º ANDAR ----------
       {
         id: 'bed_task',
-        name: gameState.storyFlags.dinner_done || (gameState.storyFlags.returned_from_school && gameState.storyFlags.activity_cooking)
+        name: gameState.storyFlags.next_morning_anomaly
+          ? gameState.storyFlags.activity_bed ? 'Cama arrumada' : 'Arrumar a cama'
+          : gameState.storyFlags.dinner_done
           ? 'Deitar para dormir (21:43)'
-          : 'Cama desarrumada',
+          : gameState.storyFlags.returned_from_school ? 'Ajude a avó com o jantar primeiro' : 'Cama desarrumada',
         type: 'EXAMINAR',
         position: [-5.7, 0.4, -0.35],
         markerPosition: [-5.7, 1.15, -0.35],
         room: 'bedroom',
         floor: 2,
         action: () => {
-          if (gameState.storyFlags.dinner_done || (gameState.storyFlags.returned_from_school && gameState.storyFlags.activity_cooking)) {
+          if (gameState.storyFlags.next_morning_anomaly) {
+            if (!gameState.storyFlags.activity_bed) setActiveMinigame('bed');
+            else showToast('A cama já está arrumada. Agora prepare a mochila e desça para a cozinha.');
+          } else if (gameState.storyFlags.dinner_done) {
             setActiveDialogueNode(DIALOGUE_NODES['bedtime_reading_1']);
+          } else if (gameState.storyFlags.returned_from_school) {
+            showToast('Primeiro ajude a avó com o jantar e jante com ela.');
           } else {
             setActiveMinigame('bed');
           }
@@ -487,7 +533,7 @@ export const App: React.FC = () => {
           else setActiveInspectionData(INSPECTABLE_OBJECTS.rotary_phone);
         },
       },
-      { id: 'grandma_chiyo_spot', name: 'Avó Chiyo', type: 'CONVERSAR', position: [2.4, 0.4, -0.55], markerPosition: [2.2, 1.65, -1.15], room: 'kitchen', floor: 1, action: dlg('morning_greeting_1') },
+      { id: 'grandma_chiyo_spot', name: 'Avó Chiyo', type: 'CONVERSAR', position: [2.4, 0.4, -0.55], markerPosition: [2.2, 1.65, -1.15], room: 'kitchen', floor: 1, action: dlg(has('next_morning_anomaly') ? 'anomaly_morning_1' : 'morning_greeting_1') },
       {
         id: 'watson_task', name: 'Watson', type: 'EXAMINAR', position: [-3.5, 0.4, 1.55], markerPosition: [-3.5, 0.55, 1.55], room: 'living_room', floor: 1,
         action: () => {
@@ -554,6 +600,15 @@ export const App: React.FC = () => {
             showToast('Ainda não é hora do jantar.');
             return;
           }
+          if (gameState.storyFlags.dinner_done) {
+            showToast('O jantar já terminou. Suba para o quarto quando estiver pronta.');
+            return;
+          }
+          if (gameState.storyFlags.activity_cooking) {
+            const wasOpen = gameState.storyFlags.director_trust === 'honest' || gameState.storyFlags.nurse_answer === 'open';
+            setActiveDialogueNode(DIALOGUE_NODES[wasOpen ? 'parents_question_open' : 'parents_question_guarded']);
+            return;
+          }
           setActiveMinigame('cooking');
         },
       },
@@ -579,7 +634,7 @@ export const App: React.FC = () => {
         garden_spot: [-5.6, 1.05, 4.4],
       } as Record<string, [number, number, number]>)[spot.id],
     })),
-    [ateBreakfast, gameState, homeReady, showToast, talkedMorning, dlg]
+    [ateBreakfast, gameState, gameState.storyFlags, homeReady, showToast, talkedMorning, dlg]
   );
 
       const anyModal = isEvidenceBoardOpen || isJournalOpen || isInventoryOpen || isSettingsOpen || isChapterSelectOpen || !!activeMinigame || clockHuntOpen || !!repairClockId;
@@ -618,6 +673,7 @@ export const App: React.FC = () => {
   const advanceDialogue = (nodeId: string | null) => {
     if (nodeId) {
       applyDialogueSideEffects(nodeId);
+      if (nodeId === 'bedtime_reflection_1') setIsSecondNightCutscene(true);
       const nextNode = DIALOGUE_NODES[nodeId];
       if (nextNode) {
         setActiveDialogueNode(nextNode);
@@ -644,14 +700,26 @@ export const App: React.FC = () => {
         gameState.setStoryFlags((p) => ({ ...p, dinner_done: true }));
         showToast('Suba para o seu quarto (2º andar) e deite-se para descansar.');
       }
-      if (closingId === 'bedtime_reading_sleep') {
-        setIsSecondNightCutscene(true);
-        soundManager.startClock(1000);
+      if (closingId === 'bedtime_reflection_3') {
         setTimeout(() => {
           setIsSecondNightCutscene(false);
-          setActiveDialogueNode(DIALOGUE_NODES['second_317_wake']);
-        }, 3600);
+          gameState.setCurrentFloor(2);
+          gameState.setCurrentLocation('bedroom');
+          gameState.setStoryFlags((p) => ({ ...p, next_morning_anomaly: true, activity_bed: false, activity_bag: false, morning_talk: false }));
+        }, 1500);
       }
+      if (closingId === 'anomaly_morning_end') {
+        setIsSecondNightCutscene(false);
+        setMapDissolving(true);
+        window.setTimeout(() => {
+          setMapDissolving(false);
+          setWorldArea('dream');
+          gameState.setStoryFlags((flags) => ({ ...flags, dream_scene_active: true }));
+        }, 2400);
+      }
+      if (['director_honest', 'director_closed'].includes(closingId)) gameState.setStoryFlags((p) => ({ ...p, school_director_done: true }));
+      if (['nurse_checkup_open', 'nurse_checkup_private'].includes(closingId)) gameState.setStoryFlags((p) => ({ ...p, school_nurse_done: true }));
+      if (closingId === 'computer_lab_mission') gameState.setStoryFlags((p) => ({ ...p, school_computer_done: true }));
       if (closingId === 'chapter_1_close') {
         setIsSecondNightCutscene(false);
         setCaseCompletedOpen(true);
@@ -662,9 +730,9 @@ export const App: React.FC = () => {
     gameState.saveGame();
   };
 
-  const handleDialogueOption = (option: { nextNodeId: string; grantClue?: string; setFlag?: string }) => {
+  const handleDialogueOption = (option: { nextNodeId: string; grantClue?: string; setFlag?: string; flagValue?: boolean | string | number }) => {
     if (option.grantClue) gameState.unlockClue(option.grantClue);
-    if (option.setFlag) gameState.setStoryFlags((p) => ({ ...p, [option.setFlag!]: true }));
+    if (option.setFlag) gameState.setStoryFlags((p) => ({ ...p, [option.setFlag!]: option.flagValue ?? true }));
     advanceDialogue(option.nextNodeId);
   };
 
@@ -723,8 +791,14 @@ export const App: React.FC = () => {
                 <option value="house">Casa</option>
                 <option value="street">Rua (ida)</option>
                 <option value="schoolhall">Corredor da Escola</option>
+                <option value="school_director">Escola — missão da diretora</option>
+                <option value="school_nurse">Escola — exame na enfermaria</option>
+                <option value="school_computer">Escola — laboratório de informática</option>
+                <option value="school_class">Escola — aula liberada</option>
+                <option value="morning_anomaly">Manhã seguinte — rotina antes da dissolução</option>
                 <option value="school">Sala de Aula / Minigame</option>
                 <option value="return">Rua (volta)</option>
+                <option value="dream">Sonho / anomalia (Babylon.js)</option>
               </select>
 
               <label className="text-sm">Tempo / Preset</label>
@@ -756,7 +830,7 @@ export const App: React.FC = () => {
       )}
 
       {activeScreen === 'gameplay' && worldArea === 'house' && (
-        <div className="relative w-full h-full">
+        <div className={`relative w-full h-full ${mapDissolving ? 'map-scene-dissolving' : ''}`}>
           <ThreeWorld
             currentFloor={gameState.currentFloor}
             onFloorChange={(floor) => {
@@ -878,7 +952,14 @@ export const App: React.FC = () => {
             paused={anyModal || !!activeDialogueNode}
             cameraMotionEnabled={cameraMotionEnabled}
             onTriggerDialogue={(id, label) => {
-              const authored = DIALOGUE_NODES[id];
+              const flags = gameState.storyFlags;
+              if (id === 'director_akiyama' && flags.school_director_done) return showToast('A diretora já conversou com você hoje.');
+              if (id === 'nurse_reiko' && !flags.school_director_done) return showToast('A diretora pediu para você passar primeiro na secretaria.');
+              if (id === 'nurse_reiko' && flags.school_nurse_done) return showToast('O exame de rotina já foi concluído.');
+              if (id === 'computer_lab_main_pc' && !flags.school_nurse_done) return showToast('Antes da aula de informática, conclua o exame na enfermaria.');
+              if (id === 'computer_lab_main_pc' && flags.school_computer_done) return showToast('O exercício e o registro do erro já foram concluídos.');
+              const dialogueId = id === 'nurse_reiko' ? 'nurse_checkup' : id === 'computer_lab_main_pc' ? 'computer_lab_mission' : id;
+              const authored = DIALOGUE_NODES[dialogueId];
               setActiveDialogueNode(authored ?? {
                 id: `school_thought_${id}`,
                 speaker: 'Pensamento',
@@ -887,6 +968,10 @@ export const App: React.FC = () => {
               });
             }}
             onSitAtDesk={() => {
+              if (!gameState.storyFlags.school_director_done || !gameState.storyFlags.school_nurse_done || !gameState.storyFlags.school_computer_done) {
+                showToast('Conclua as três missões da manhã antes de começar a aula.');
+                return;
+              }
               if (!nextSubject) {
                 showToast('As aulas de hoje terminaram.');
                 return;
@@ -915,11 +1000,7 @@ export const App: React.FC = () => {
           </div>
           <div className="absolute bottom-6 inset-x-0 z-20 text-center pointer-events-none hud-shadow">
             <span className="font-serif-jp text-[10px] tracking-[0.4em] text-red-400/80 uppercase">Objetivo</span>
-            <p className="font-serif-jp text-sm text-neutral-200 mt-1">
-              {nextSubject
-                ? `Vá até a sala 2-B, no fim do corredor, e sente-se na sua mesa para ${SUBJECT_LABELS[nextSubject]}.`
-                : 'Todas as aulas terminaram. Saia pelo corredor.'}
-            </p>
+            <p className="font-serif-jp text-sm text-neutral-200 mt-1">{currentObjective}</p>
           </div>
         </div>
       )}
@@ -938,6 +1019,8 @@ export const App: React.FC = () => {
               setWorldArea('house');
               gameState.setCurrentFloor(1);
               gameState.setCurrentLocation('living_room');
+              gameState.setStoryFlags((flags) => ({ ...flags, returned_from_school: true }));
+              setActiveDialogueNode(DIALOGUE_NODES['home_return']);
               showToast('Você voltou para casa.');
               gameState.saveGame();
             }}
@@ -1010,6 +1093,17 @@ export const App: React.FC = () => {
         />
       )}
 
+      {activeScreen === 'gameplay' && worldArea === 'dream' && (
+        <DreamBabylonScene onComplete={() => {
+          setWorldArea('house');
+          setIsSecondNightCutscene(false);
+          setCaseCompletedOpen(true);
+          gameState.setCurrentChapter(2);
+          gameState.setStoryFlags((flags) => ({ ...flags, chapter_1_complete: true, dream_scene_active: false }));
+          gameState.saveGame();
+        }} />
+      )}
+
       {activeDialogueNode && (
         <DialogueBox node={activeDialogueNode} onSelectOption={handleDialogueOption} onNext={() => advanceDialogue(activeDialogueNode.next ?? null)} onClose={() => advanceDialogue(null)} />
       )}
@@ -1025,6 +1119,13 @@ export const App: React.FC = () => {
             gameState.saveGame();
           }}
         />
+      )}
+
+      {mapDissolving && (
+        <div className="fixed inset-0 z-[75] pointer-events-none overflow-hidden" aria-hidden="true">
+          <div className="absolute inset-0 animate-[mapDissolve_2.4s_ease-in_forwards] bg-white" />
+          <div className="absolute inset-0 animate-[mapDissolve_2.4s_ease-in_forwards] opacity-70" style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, white 0 2px, transparent 3px), radial-gradient(circle at 65% 70%, white 0 3px, transparent 4px), radial-gradient(circle at 80% 20%, white 0 2px, transparent 3px)', backgroundSize: '19px 23px, 29px 31px, 37px 41px' }} />
+        </div>
       )}
 
       {activeScreen === 'gameplay' && worldArea !== 'house' && (
@@ -1159,14 +1260,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {isSecondNightCutscene && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center text-center font-mono select-none animate-fade-in">
-          <p className="text-neutral-500 text-xs tracking-[0.5em] mb-4">KYOTO · 03:16 AM</p>
-          <p className="text-3xl text-neutral-400 font-title tracking-[0.3em] mb-2">TIC.</p>
-          <p className="text-6xl text-red-500 font-title font-bold tracking-[0.3em] animate-pulse">03:17</p>
-          <p className="text-neutral-600 text-xs mt-6 tracking-widest">O som do relógio desaparece...</p>
-        </div>
-      )}
+      {isSecondNightCutscene && <div className="fixed inset-0 z-[40] bg-black" />}
 
       {caseCompletedOpen && (
         <CaseCompletedModal

@@ -42,7 +42,7 @@ export interface SchoolBuild {
   spots: SchoolSpot[];
   doors: SchoolDoor[];
   toggleDoor: (id: string) => void;
-  updateCameraOcclusion: (camera: THREE.Camera, player: THREE.Vector3) => void;
+  updateCameraOcclusion: (camera: THREE.Camera, player: THREE.Vector3, dt?: number) => void;
   deskAt: [number, number];
   dispose: () => void;
 }
@@ -108,7 +108,21 @@ const shelfLoader = new GLTFLoader();
     
     // Shared wall materials — created once, reused across ALL tiledWall calls
     // This alone cuts ~60 MeshStandardMaterial allocations down to 3.
-    const _sharedTileMat = new THREE.MeshStandardMaterial({ color: 0xdedbd3, roughness: 0.62, metalness: 0.03, transparent: true });
+    const wallCanvas = document.createElement('canvas');
+    wallCanvas.width = wallCanvas.height = 256;
+    const wallCtx = wallCanvas.getContext('2d')!;
+    wallCtx.fillStyle = '#e4e1d9'; wallCtx.fillRect(0, 0, 256, 256);
+    for (let y = 0; y < 256; y += 64) for (let x = 0; x < 256; x += 64) {
+      wallCtx.fillStyle = (x / 64 + y / 64) % 2 ? '#d9d7cf' : '#e9e6de';
+      wallCtx.fillRect(x + 2, y + 2, 60, 60);
+      wallCtx.fillStyle = 'rgba(90,83,72,.16)'; wallCtx.fillRect(x, y, 64, 2); wallCtx.fillRect(x, y, 2, 64);
+      wallCtx.fillStyle = 'rgba(255,255,255,.2)'; wallCtx.fillRect(x + 3, y + 3, 57, 2);
+    }
+    const wallTexture = new THREE.CanvasTexture(wallCanvas);
+    wallTexture.colorSpace = THREE.SRGBColorSpace;
+    wallTexture.wrapS = wallTexture.wrapT = THREE.RepeatWrapping;
+    wallTexture.repeat.set(2, 1);
+    const _sharedTileMat = new THREE.MeshStandardMaterial({ map: wallTexture, color: 0xffffff, roughness: 0.72, metalness: 0.01, transparent: true });
     const _sharedBaseboardMat = new THREE.MeshStandardMaterial({ color: 0x2a1a11, roughness: 0.6, metalness: 0.03, transparent: true });
 
     const tiledWall = (w: number, h: number, x: number, z: number, ry = 0) => {
@@ -189,9 +203,6 @@ const shelfLoader = new GLTFLoader();
       const fixture = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.38), _ceilLightMat);
       fixture.position.set(x, 3.85, z);
       root.add(fixture);
-      const light = new THREE.PointLight(0xffedc4, 0.48, 8, 2);
-      light.position.set(x, 3.55, z);
-      root.add(light);
     };
     // Shared pendant materials — created once, reused for both pendantLamps
     const _pendantShadeMat = new THREE.MeshStandardMaterial({ color: 0x3a2518, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide });
@@ -208,9 +219,6 @@ const shelfLoader = new GLTFLoader();
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.105, 8, 6), _pendantBulbMat);
       bulb.position.set(x, 2.58, z);
       root.add(bulb);
-      const light = new THREE.PointLight(0xffb060, 1.8, 9, 2.2);
-      light.position.set(x, 2.55, z);
-      root.add(light);
     };
     const poster = (x: number, z: number, text: string) => {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 0.72), new THREE.MeshBasicMaterial({ map: T.doorPlate(text), side: THREE.DoubleSide, toneMapped: false }));
@@ -228,9 +236,6 @@ const shelfLoader = new GLTFLoader();
       g.position.set(x, 0, z);
       g.rotation.y = ry;
       root.add(g);
-      const daylight = new THREE.PointLight(0xb7c8dc, 0.42, 5, 2);
-      daylight.position.set(x, 2.2, z + (ry === 0 ? 0.45 : 0));
-      root.add(daylight);
     };
     const cabinet = (w = 1.5, h = 1.25) => {
       const g = new THREE.Group();
@@ -272,13 +277,13 @@ const shelfLoader = new GLTFLoader();
     };
 
     // Room ceiling light — warm amber fluorescent strip
-    const roomCeilingLight = (x: number, z: number, _col = 0xffeabb, intensity = 1.1) => {
+    const roomCeilingLight = (x: number, z: number, _col = 0xffeabb, _intensity = 1.1) => {
       const fix = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.06, 0.36), _ceilFixMat);
       fix.position.set(x, CEIL_Y - 0.1, z);
       root.add(fix);
-      const pl = new THREE.PointLight(0xffd890, intensity, 9, 1.8);
-      pl.position.set(x, CEIL_Y - 0.25, z);
-      root.add(pl);
+      // Repeated per-room point lights made every standard-material shader
+      // evaluate dozens of lights. The luminous fixture keeps the warm look
+      // while the school uses a small shared set of real lights.
     };
 
     // Infirmary: cooler white light
@@ -286,9 +291,6 @@ const shelfLoader = new GLTFLoader();
       const fix = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.28), _infixMat);
       fix.position.set(x, CEIL_Y - 0.08, z);
       root.add(fix);
-      const pl = new THREE.PointLight(0xe8f4ff, 1.2, 8, 1.8);
-      pl.position.set(x, CEIL_Y - 0.2, z);
-      root.add(pl);
     };
 
     // Wall sconce — bracket flush to wall, no floating
@@ -305,9 +307,6 @@ const shelfLoader = new GLTFLoader();
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.055, 7, 5), _sconceBulbMat);
       bulb.position.set(wx + ox * 2, 2.25, wz + oz * 2);
       root.add(bulb);
-      const pl = new THREE.PointLight(0xffb060, 0.65, 4.5, 2);
-      pl.position.set(wx + ox * 2.5, 2.25, wz + oz * 2.5);
-      root.add(pl);
     };
 
     // Drinking fountain (bebedouro)
@@ -489,7 +488,7 @@ const shelfLoader = new GLTFLoader();
       // Fill solid wall above the door opening (no gap!)
       const fillH = wallH - 2.1;
       if (fillH > 0.05) {
-        const fillMat = new THREE.MeshStandardMaterial({ color: 0xdedbd3, roughness: 0.62, metalness: 0.03 });
+        const fillMat = _sharedTileMat;
         const fillMesh = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.04, fillH, 0.16), fillMat);
         fillMesh.position.set(centerX, 2.1 + fillH / 2, z);
         fillMesh.castShadow = false; fillMesh.receiveShadow = false;
@@ -536,7 +535,12 @@ const shelfLoader = new GLTFLoader();
     tiledWall(56, 4.2, 0, -18.2);
     tiledWall(56, 4.2, 0, 6.2);
     tiledWall(24.4, 4.2, -27, -6, Math.PI / 2);
-    tiledWall(24.4, 4.2, 27, -6, Math.PI / 2);
+    // Connect an eastern school annex through a wide doorway.
+    tiledWall(8.5, 4.2, 27, -12.75, Math.PI / 2);
+    tiledWall(12.5, 4.2, 27, 2.75, Math.PI / 2);
+    tiledWall(24.4, 4.2, 43, -6, Math.PI / 2);
+    tiledWall(16, 4.2, 35, -18.2);
+    tiledWall(16, 4.2, 35, 6.2);
 
     // Entrance - Enhanced with more details
     // A double glass portal set into the west facade marks this as the school entrance.
@@ -641,6 +645,7 @@ const shelfLoader = new GLTFLoader();
     put(Mo.chair('leather'), -19.5, 0, -8.6, Math.PI, [0.6, 0.6]);
     put(Mo.printer(), -24.5, 0, -10.5, Math.PI / 2, [0.8, 0.5]);
     put(cabinet(1.2), -24.5, 0, -13.5, Math.PI / 2, [1.2, 0.5]);
+    put(Mo.plant('bonsai'), -18.8, 0, -8.4, 0, [0.45, 0.45]);
     put(Mo.whiteboard(), -21, 1.2, -18.0, 0, [1.8, 0.08]);
     put(noticeBoard(1.0), -23, 1.15, -18.0, 0, [1.0, 0.12]);
     // Windows flush to walls
@@ -1037,8 +1042,10 @@ const shelfLoader = new GLTFLoader();
     // More corridor/back-room details
     // ── CORREDOR CENTRAL — DECORAÇÕES COMPLETAS ────────────────────────────────
     // Shared materials para decorações do corredor — evita alocações repetidas
-    const _festivalBannerColors = [0xe8223a, 0x2255c8, 0xeec024, 0x2a7a3a, 0xdd5520];
-    const _bannerMats = _festivalBannerColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
+    const _festivalBannerColors = [0xe8223a, 0x2255c8, 0xeec024, 0x2a7a3a, 0xdd5520].map((color) => new THREE.Color(color));
+    const _bannerMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, side: THREE.DoubleSide });
+    const _bannerGeometry = new THREE.PlaneGeometry(0.28, 0.36);
+    const _bannerTransform = new THREE.Object3D();
     const _metalLockerMat = Mo.std(0x60758a, 0.45, 0.55);
     const _cabinetIronMat = Mo.std(0x4a5560, 0.45, 0.6);
     const _tableTopMat    = Mo.MAT.oak;
@@ -1098,16 +1105,20 @@ const shelfLoader = new GLTFLoader();
       // fio
       const wire = new THREE.Mesh(new THREE.BoxGeometry(len, 0.012, 0.012), Mo.MAT.iron);
       wire.position.set(cx, y, z); root.add(wire);
-      // bandeirinhas a cada 0.7 m
+      // Instanced flags retain the festival colors with one draw call per span.
       const count = Math.floor(len / 0.7);
+      const flags = new THREE.InstancedMesh(_bannerGeometry, _bannerMat, count);
       for (let i = 0; i < count; i++) {
         const bx = x1 + (i + 0.5) * (len / count);
-        const mat = _bannerMats[i % _bannerMats.length];
-        const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.36), mat);
-        flag.position.set(bx, y - 0.2, z);
-        flag.rotation.x = 0.15 + (i % 3) * 0.08;
-        root.add(flag);
+        _bannerTransform.position.set(bx, y - 0.2, z);
+        _bannerTransform.rotation.set(0.15 + (i % 3) * 0.08, 0, 0);
+        _bannerTransform.updateMatrix();
+        flags.setMatrixAt(i, _bannerTransform.matrix);
+        flags.setColorAt(i, _festivalBannerColors[i % _festivalBannerColors.length]);
       }
+      flags.instanceMatrix.needsUpdate = true;
+      if (flags.instanceColor) flags.instanceColor.needsUpdate = true;
+      root.add(flags);
     };
 
     // ── Cartaz de parede (mais elaborado que o poster simples)
@@ -1201,6 +1212,37 @@ const shelfLoader = new GLTFLoader();
     festivalBanner(  4, 14,  3.72, 0.0);   // trecho central-leste
     festivalBanner( 14, 26,  3.72, 0.0);   // trecho leste
 
+    // Lanternas de papel do matsuri, agrupadas em instâncias para não pesar
+    // como dezenas de objetos separados no corredor.
+    const lanternPositions = [-23.5, -16.8, -10.1, -3.4, 3.4, 10.1, 16.8, 23.5];
+    const lanternGeometry = new THREE.SphereGeometry(0.23, 8, 6);
+    const lanternCapGeometry = new THREE.CylinderGeometry(0.075, 0.075, 0.055, 6);
+    const lanternCordGeometry = new THREE.CylinderGeometry(0.008, 0.008, 0.34, 4);
+    const lanternColors = [0xc93245, 0xf1d99d, 0x46969b, 0xe98442];
+    const lanternDummy = new THREE.Object3D();
+    lanternColors.forEach((color, colorIndex) => {
+      const positions = lanternPositions.filter((_, index) => index % lanternColors.length === colorIndex);
+      const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.8, roughness: 0.85 });
+      const bodies = new THREE.InstancedMesh(lanternGeometry, material, positions.length);
+      positions.forEach((x, i) => {
+        lanternDummy.position.set(x, 3.0, 1.1);
+        lanternDummy.rotation.set(0, 0, ((i + colorIndex) % 3 - 1) * 0.06);
+        lanternDummy.scale.set(0.86, 1.25, 0.86);
+        lanternDummy.updateMatrix(); bodies.setMatrixAt(i, lanternDummy.matrix);
+      });
+      bodies.instanceMatrix.needsUpdate = true; root.add(bodies);
+    });
+    const lanternCaps = new THREE.InstancedMesh(lanternCapGeometry, Mo.MAT.darkWood, lanternPositions.length);
+    const lanternCords = new THREE.InstancedMesh(lanternCordGeometry, Mo.MAT.iron, lanternPositions.length);
+    lanternPositions.forEach((x, i) => {
+      lanternDummy.rotation.set(0, 0, 0); lanternDummy.scale.setScalar(1);
+      lanternDummy.position.set(x, 3.29, 1.1); lanternDummy.updateMatrix(); lanternCaps.setMatrixAt(i, lanternDummy.matrix);
+      lanternDummy.position.set(x, 3.64, 1.1); lanternDummy.updateMatrix(); lanternCords.setMatrixAt(i, lanternDummy.matrix);
+    });
+    lanternCaps.instanceMatrix.needsUpdate = true; lanternCords.instanceMatrix.needsUpdate = true;
+    root.add(lanternCaps, lanternCords);
+    [-18, 0, 18].forEach((x) => ceilingLight(x, 0));
+
     // Plantas decorativas — já existentes + novas posições
     corridorPlant(-14.5, 2.8);
     corridorPlant(  5.0, 2.5);
@@ -1209,9 +1251,18 @@ const shelfLoader = new GLTFLoader();
     corridorPlant(  0.0,  4.5);  // centro do corredor
     corridorPlant( 12.0, -4.5);
 
+    // A few green corners inside classrooms break up the long corridor view.
+    corridorPlant(-0.8, -16.8);  // library
+    corridorPlant(-18.7, -16.8); // computer room
+    corridorPlant( 15.0, -7.2); // art room
+    corridorPlant( 17.8, -17.0); // classroom 2-B
+
     // Bebedouros
     waterFountain(-17.5, 5.65, 0);
     waterFountain(  9.0, 5.65, 0);
+
+    // Waiting bench placed flush against the corridor wall to keep the walking lane open.
+    put(bench(), -10.5, 0, 4.7, 0, [2.1, 0.65]);
 
     // Extintores de incêndio (junto às paredes)
     fireExtinguisher(-25.5, 4.8);
@@ -1228,10 +1279,34 @@ const shelfLoader = new GLTFLoader();
     doorPlate('2-B',      21.5, -5.86);
 
     // Spots de interação para as decorações
-    spots.push({ id: 'cafeteria_table_w', name: 'Mesa do Refeitório', type: 'EXAMINAR', x: -8.5, z: 0, dialogueNodeId: 'cafeteria_table' });
-    spots.push({ id: 'cafeteria_table_e', name: 'Mesa do Refeitório', type: 'EXAMINAR', x:  6.5, z: 0, dialogueNodeId: 'cafeteria_table' });
-    spots.push({ id: 'corridor_banner_w', name: 'Faixa do Festival',  type: 'EXAMINAR', x:-17.5, z: 0, dialogueNodeId: 'corridor_festival_banner' });
-    spots.push({ id: 'corridor_banner_e', name: 'Faixa do Festival',  type: 'EXAMINAR', x:  9.0, z: 0, dialogueNodeId: 'corridor_festival_banner' });
+    spots.push({ id: 'cafeteria_table_w', name: 'Mesa do Refeitório', type: 'EXAMINAR', x: -8.5, z: 0, dialogueNodeId: 'cafeteria_table_w' });
+    spots.push({ id: 'cafeteria_table_e', name: 'Mesa do Refeitório', type: 'EXAMINAR', x:  6.5, z: 0, dialogueNodeId: 'cafeteria_table_e' });
+    spots.push({ id: 'corridor_banner_w', name: 'Faixa do Festival',  type: 'EXAMINAR', x:-17.5, z: 0, dialogueNodeId: 'corridor_banner_w' });
+    spots.push({ id: 'corridor_banner_e', name: 'Faixa do Festival',  type: 'EXAMINAR', x:  9.0, z: 0, dialogueNodeId: 'corridor_banner_e' });
+    // Connected east wing: cafeteria, kitchen and supply room.
+    put(Mo.woodFloor(16, 24), 35, 0, -6);
+    put(Mo.box(16, 0.1, 24, Mo.std(0x666666)), 35, -0.05, -6);
+    tiledWall(7.25, 3.2, 30.875, -5.6);
+    tiledWall(7.25, 3.2, 39.125, -5.6);
+    tiledWall(7.25, 3.2, 30.875, -11.8);
+    tiledWall(7.25, 3.2, 39.125, -11.8);
+    ceilingPanel(35, -2.8, 16, 6.2);
+    ceilingPanel(35, -8.8, 16, 6.2);
+    ceilingPanel(35, -14.9, 16, 6.2);
+    sign('食堂 · REFEITÓRIO', 35, 3.1, 5.82, 2.8, 0.42, Math.PI);
+    sign('調理室 · COZINHA', 35, 3.1, -5.35, 2.5, 0.4, 0);
+    sign('倉庫 · ALMOXARIFADO', 35, 3.1, -11.55, 2.8, 0.4, 0);
+    const annexTable = (x: number, z: number) => cafeteriaTable(x, z);
+    annexTable(31.5, 1.1); annexTable(38.5, 1.1); annexTable(31.5, -2.7); annexTable(38.5, -2.7);
+    put(Mo.box(5.2, 0.12, 0.9, Mo.MAT.steel), 35, 0.92, -8.8, 0, [5.3, 1]);
+    put(Mo.box(2.8, 1.6, 0.65, Mo.MAT.steel), 30.2, 0.8, -9.4, 0, [2.9, 0.8]);
+    put(Mo.box(1.2, 1.2, 0.9, Mo.MAT.darkWood), 39.2, 0.6, -15.2, 0, [1.2, 1]);
+    put(Mo.box(3.2, 0.08, 1.1, Mo.MAT.oak), 34.5, 1.05, -15.5, 0, [3.3, 1.2]);
+    for (const [id, name, x, z] of [
+      ['annex_cafeteria', 'Balcão do Refeitório', 35, 5.3],
+      ['annex_kitchen', 'Bancada da Cozinha', 35, -8.8],
+      ['annex_storage', 'Prateleiras do Almoxarifado', 34.5, -15.5],
+    ] as const) spots.push({ id, name, type: 'EXAMINAR', x, z, dialogueNodeId: id });
     // Additional windows flush to perimeter walls (already handled per-room above,
     // these are the classroom back-wall windows)
     rainyWindow(22, -17.9, 0, 2.2);
@@ -1260,6 +1335,7 @@ const shelfLoader = new GLTFLoader();
     put(Mo.desk(),           24.5, 0, -7.8,  Math.PI, [2.2, 1.0]);
     put(Mo.chair('leather'), 24.5, 0, -9.0,  Math.PI, [0.6, 0.6]);
     put(Mo.whiteboard(),     21.5, 1.2, -17.85, 0, [1.8, 0.08]);
+    put(Mo.plant('bonsai'), 25.1, 0, -7.1, 0, [0.45, 0.45]);
 
     // Alphabet/periodic table wall decorations
     [20.5, 22.0, 23.5, 25.0].forEach((px, i) => {
@@ -1285,7 +1361,7 @@ const shelfLoader = new GLTFLoader();
     seatRing.position.set(deskAt[0], 0.03, deskAt[1]);
     root.add(seatRing);
     anims.push((t) => { const s = 1 + Math.sin(t * 2.8) * 0.1; seatRing.scale.set(s, s, 1); });
-    spots.push({ id: 'sabrina_desk_seat', name: 'Sua carteira (2-B)', type: 'EXAMINAR', x: deskAt[0], z: deskAt[1] });
+    spots.push({ id: 'sabrina_desk_seat', name: 'Sua carteira (2-B)', type: 'EXAMINAR', x: deskAt[0], z: deskAt[1], dialogueNodeId: 'sabrina_desk_seat' });
 
     // Courtyard: small shrine
     put(Mo.box(4.0, 0.02, 3.5, Mo.MAT.gravel || Mo.std(0x7a7974)), -5, 0.01, 3.5);
@@ -1352,7 +1428,8 @@ const shelfLoader = new GLTFLoader();
 
     // Secretary NPC
     npcs.push(
-      { id: 'secretary_mei', name: 'Mei Chen', role: 'Secretária', x: -13.5, z: -15.5, lines: ['Formulários de inscrição estão na mesa.'], dialogueNodeId: 'secretary_mei' }
+      { id: 'secretary_mei', name: 'Mei Chen', role: 'Secretária', x: -13.5, z: -15.5, lines: ['Formulários de inscrição estão na mesa.'], dialogueNodeId: 'secretary_mei' },
+      { id: 'director_akiyama', name: 'Diretora Akiyama', role: 'Diretora', x: -10.5, z: -15.5, lines: ['Gabriela, posso conversar com você um instante?'], dialogueNodeId: 'director_akiyama' }
     );
 
     // Computer room teacher
@@ -1365,12 +1442,11 @@ const shelfLoader = new GLTFLoader();
       { id: 'courtyard_keeper', name: 'Velho Kashimoto', role: 'Guardião do Santuário', x: -4.5, z: 3.5, lines: ['Que bom ver jovens visitando o santuário.'], dialogueNodeId: 'courtyard_keeper' }
     );
 
-    const updateCameraOcclusion = (camera: THREE.Camera, player: THREE.Vector3) => {
+    const updateCameraOcclusion = (camera: THREE.Camera, player: THREE.Vector3, dt = 1 / 60) => {
       occlusionWalls.forEach((wall) => {
         const materials = wall.userData.fadeMaterials as THREE.MeshStandardMaterial[];
-        materials.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 1, 14, 1 / 60); });
+        materials.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 1, 14, dt); });
       });
-      root.updateMatrixWorld();
       const direction = player.clone().sub(camera.position);
       const distance = direction.length();
       if (distance < 0.01) return;
@@ -1381,12 +1457,12 @@ const shelfLoader = new GLTFLoader();
         while (parent && !occlusionWalls.includes(parent as THREE.Group)) parent = parent.parent;
         if (parent) {
           const materials = (parent as THREE.Group).userData.fadeMaterials as THREE.MeshStandardMaterial[];
-          materials?.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 0.14, 18, 1 / 60); });
+          materials?.forEach((material) => { material.opacity = THREE.MathUtils.damp(material.opacity, 0.14, 18, dt); });
         }
       }
     };
 
-    const bounds = () => ({ minX: -26.5, maxX: 26.5, minZ: -18.2, maxZ: 6.2 });
+    const bounds = () => ({ minX: -26.5, maxX: 42.5, minZ: -18.2, maxZ: 6.2 });
     const animate: Anim = (t, dt) => {
       anims.forEach((a) => a(t, dt));
       doorParts.forEach(({ door, pivot }) => {

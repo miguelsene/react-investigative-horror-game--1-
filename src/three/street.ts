@@ -3,7 +3,7 @@ import type { Anim } from './models';
 import * as T from './textures';
 import { STREET, roadZ, walkZ } from '../data/streetRoute';
 import { createSilhouette, setSilhouetteFrame } from './silhouetteSprite';
-import { asphaltTexture, concreteTexture, facadeTexture, shopTexture } from './facadeTextures';
+import { asphaltTexture, barkTexture, concreteTexture, facadeTexture, foliageTexture, roofTileTexture, shopTexture } from './facadeTextures';
 
 /* ============================================================
    KYOTO RESIDENTIAL STREET — long, decorated, alive.
@@ -54,16 +54,16 @@ export const buildStreet = (): StreetBuild => {
     plasterC: mat(0x9c9184, 0.9),
     wood: mat(0x3f2f24, 0.75),
     woodDark: mat(0x2a1f18, 0.7),
-    roof: mat(0x22262e, 0.8),
-    roofTile: mat(0x2b3038, 0.75),
+    roof: new THREE.MeshStandardMaterial({ color: 0x777777, map: roofTileTexture(), roughness: 0.88 }),
+    roofTile: new THREE.MeshStandardMaterial({ color: 0x777777, map: roofTileTexture(), roughness: 0.88 }),
     metal: mat(0x8b929b, 0.4, 0.6),
     darkMetal: mat(0x2a2d33, 0.5, 0.4),
     white: mat(0xd8d6cf, 0.8),
     red: mat(0xa5302c, 0.7),
     woodRed: mat(0x7a2724, 0.78),
-    leaf: mat(0x415a3a, 0.9),
-    leafLight: mat(0x4f6b44, 0.9),
-    trunk: mat(0x3b2b21, 0.9),
+    leaf: new THREE.MeshStandardMaterial({ color: 0x788078, map: foliageTexture(), roughness: 1 }),
+    leafLight: new THREE.MeshStandardMaterial({ color: 0x97998c, map: foliageTexture(), roughness: 1 }),
+    trunk: new THREE.MeshStandardMaterial({ color: 0xa09a91, map: barkTexture(), roughness: 1 }),
     glassLit: glow(0xffe3b4, 0xffca7d, 0.75),
     glassCold: glow(0xdfe6ef, 0xa9c3e0, 0.35),
     sign: mat(0xe8e2d2, 0.85),

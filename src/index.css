@@ -207,6 +207,11 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 .area-loading { position: fixed; inset: 0; z-index: 10000; display: grid; place-content: center; gap: 13px; color: rgba(240,235,224,.8); background: rgba(5,6,8,.72); font: 10px 'Shippori Mincho', serif; letter-spacing: .42em; text-transform: uppercase; animation: areaLoad .42s ease both; pointer-events: none; }
 .area-loading-mark { width: 110px; height: 1px; background: linear-gradient(90deg, transparent, #bd3037, transparent); animation: loadingScan .72s ease-in-out infinite; }
 @keyframes areaLoad { from { opacity: 0 } to { opacity: 1 } }
+@keyframes mapDissolve { 0% { opacity: 0; filter: blur(0) } 45% { opacity: .72; filter: blur(1px) } 100% { opacity: 1; filter: blur(8px) } }
+@keyframes mapSceneDissolve { 0% { opacity: 1; filter: brightness(1) grayscale(0) blur(0); transform: scale(1) } 42% { opacity: .9; filter: brightness(1.8) grayscale(.5) blur(1px); transform: scale(1.01) } 100% { opacity: 0; filter: brightness(4) grayscale(1) blur(10px); transform: scale(1.035) } }
+.map-scene-dissolving { animation: mapSceneDissolve 2.4s ease-in forwards; }
+@keyframes dreamWarp { 0%,100% { opacity: .5; transform: scale(1) rotate(0deg); filter: hue-rotate(0deg) blur(1px) } 50% { opacity: .9; transform: scale(1.08) rotate(1.5deg); filter: hue-rotate(24deg) blur(3px) } }
+.dream-warp-layer { opacity: .65; mix-blend-mode: screen; animation: dreamWarp 6s ease-in-out infinite; }
 @keyframes loadingScan { 50% { transform: scaleX(.35); opacity: .35 } }
 
 /* ---------- Generic ---------- */

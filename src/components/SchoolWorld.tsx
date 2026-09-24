@@ -42,7 +42,9 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       return;
     }
     renderer.setSize(Math.max(1, mount.clientWidth), Math.max(1, mount.clientHeight));
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.0));
+    // The school has a dense, mostly static interior. Render below native
+    // resolution and cap at 45 fps to keep the dense school scene responsive.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.75));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -51,12 +53,12 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020304);
-    scene.fog = new THREE.FogExp2(0x090807, 0.045);
+    scene.background = new THREE.Color(0x10151b);
+    scene.fog = new THREE.FogExp2(0x171b20, 0.032);
     // Hemisphere for ambient fill — cheap
-    scene.add(new THREE.HemisphereLight(0xffe7b0, 0x121822, 1.3));
+    scene.add(new THREE.HemisphereLight(0xc8dcef, 0x292b27, 1.0));
     // One directional key light — no shadow (school is interior, lit by ceiling strips)
-    const sun = new THREE.DirectionalLight(0xffd68a, 0.5);
+    const sun = new THREE.DirectionalLight(0xffd39a, 0.38);
     sun.position.set(-10, 11, 8);
     sun.castShadow = false;
     scene.add(sun);
@@ -65,10 +67,11 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     const school = buildSchool();
     // Do NOT cast/receive shadows per-mesh — too expensive with ~900 meshes and no shadow map
     scene.add(school.group);
-    // 3 corridor accent lights instead of 6 — halves the room light count from SchoolWorld side
-    [[-16, -12, 0xffd299], [-2, -12, 0xffc072], [17, -12, 0xffd39c]].forEach(([x, z, color]) => {
-      const lamp = new THREE.PointLight(color as number, 0.45, 12, 2);
-      lamp.position.set(x as number, 3.05, z as number);
+    // Eight ceiling lamps light the main school zones with one small shared pool.
+    // Their visible fixtures are built into the map; these provide the actual falloff.
+    [[-21, -12, 0xffe1b0], [-13, -12, 0xffdfaa], [5, -12, 0xe5f0ff], [13, -12, 0xffd9a0], [21, -12, 0xffe0ad], [-18, 0, 0xffddb0], [0, 0, 0xffddb0], [18, 0, 0xffddb0]].forEach(([x, z, color]) => {
+      const lamp = new THREE.PointLight(color as number, 0.5, 10, 2);
+      lamp.position.set(x as number, 3.68, z as number);
       scene.add(lamp);
     });
     // Static dust — no per-frame buffer upload
@@ -113,6 +116,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     let nearestDoor: SchoolDoor | null = null;
     let nearDeskLocal = false;
     let currentMotionSpeed = 0;
+    let hudValue: string | null = null;
 
     const talk = () => {
       if (live.current.paused) return;
@@ -188,14 +192,16 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     clock.connect(document);
     let raf = 0;
     let stepTimer = 0;
+    let lastFrame = 0;
     // Throttle occlusion updates — every 3rd frame is enough (saves ~60 damp calls/frame)
     let occlusionFrame = 0;
-    const loop = () => {
+    const loop = (now = performance.now()) => {
       raf = requestAnimationFrame(loop);
+      if (document.hidden || now - lastFrame < 1000 / 60) return;
+      lastFrame = now;
       clock.update();
       const dt = Math.min(clock.getDelta(), 0.05);
       const t = clock.getElapsed();
-      if (document.hidden) return;
       school.animate(t, dt);
       // Dust is static — no per-frame upload needed
 
@@ -244,8 +250,10 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       rig.update(pos, vx, vz, dt, t, zoomLevelRef.current, live.current.cameraMotionEnabled, live.current.paused);
       // Run occlusion every 3 frames — imperceptible latency, saves ~60 material.opacity damps/frame
       occlusionFrame++;
-      if (occlusionFrame % 3 === 0) school.updateCameraOcclusion(camera, pos);
+      if (occlusionFrame % 6 === 0) school.updateCameraOcclusion(camera, pos, dt * 6);
 
+      // Interaction prompts only need refreshing several times per second.
+      if (occlusionFrame % 6 === 0) {
       // Nearest interactable NPC
       let bestDoor: SchoolDoor | null = null;
       let bestDoorDist = 1.35;
@@ -284,13 +292,15 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       const dDesk = Math.hypot(pos.x - school.deskAt[0], pos.z - school.deskAt[1]);
       nearDeskLocal = dDesk < 1.35;
 
-      setHud(() => {
+      const nextHud = (() => {
         if (bestDoor) return `${bestDoor.isOpen ? 'FECHAR' : 'ABRIR'}: Porta da sala`;
         if (nearDeskLocal && currentMotionSpeed < 0.3) return 'SENTAR NA CARTEIRA: Sala 2-B';
         if (bestNpc) return `CONVERSAR: ${bestNpc.name}`;
         if (bestSpot) return `${bestSpot.type}: ${bestSpot.name}`;
         return null;
-      });
+      })();
+      if (nextHud !== hudValue) { hudValue = nextHud; setHud(nextHud); }
+      }
 
       const updater = (school.group as unknown as { updateBubbles?: (x: number, z: number) => void }).updateBubbles;
       updater?.(pos.x, pos.z);

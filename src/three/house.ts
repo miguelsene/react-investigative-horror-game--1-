@@ -460,6 +460,8 @@ export const buildFloor = (floor: 1 | 2, scene: THREE.Scene): HouseBuild => {
     /* ---------- GABRIELA'S ROOM ---------- */
     put(Mo.windowUnit(2.6, 1.9), -3.3, 1.85, -2.44);
     put(Mo.bed(), -5.7, 0.16, -1.15, 0, [1.85, 2.65]);
+    // A black cat settles beside Gabriela's bed for the night.
+    put(Mo.cat(-4.65, -3.65, 0.65), 0, 0, 0);
     put(Mo.nightstand(), -4.15, 0.16, -2.05, 0, [0.6, 0.6]);
     putClock('bedroom_clock', -4.21, 0.79, -1.97, true);
     put(Mo.desk(), -1.7, 0.16, -1.95, 0, [2.2, 1.0]);

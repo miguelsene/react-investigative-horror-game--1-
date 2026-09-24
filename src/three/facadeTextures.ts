@@ -73,7 +73,52 @@ export const facadeTexture = (base = '#8d8175', trim = '#e7dfcf', floors = 3) =>
       ctx.stroke();
     }
   }
+  // Fine plaster mottling and a restrained darker band at the building base.
+  const plaster = ctx.createLinearGradient(0, 0, 256, 256);
+  plaster.addColorStop(0, 'rgba(255,255,255,.09)'); plaster.addColorStop(1, 'rgba(30,26,22,.12)');
+  ctx.fillStyle = plaster; ctx.fillRect(0, 0, 256, 256);
+  ctx.fillStyle = 'rgba(50,43,35,.12)'; ctx.fillRect(0, 238, 256, 18);
   return toTex(c);
+};
+
+export const barkTexture = () => {
+  const c = canvas(128, 256); const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#594331'; ctx.fillRect(0, 0, 128, 256);
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * 128; const width = 1 + Math.random() * 5;
+    ctx.fillStyle = i % 2 ? 'rgba(24,17,12,.32)' : 'rgba(213,174,119,.16)';
+    ctx.fillRect(x, 0, width, 256);
+  }
+  for (let i = 0; i < 16; i++) {
+    ctx.strokeStyle = 'rgba(30,21,14,.3)'; ctx.lineWidth = 1;
+    ctx.beginPath(); const x = Math.random() * 128; ctx.moveTo(x, Math.random() * 256); ctx.lineTo(x + (Math.random() - .5) * 10, 256); ctx.stroke();
+  }
+  return toTex(c, 1, 2);
+};
+
+export const foliageTexture = () => {
+  const c = canvas(128, 128); const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#40583a'; ctx.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 900; i++) {
+    const shade = ['#263e2e', '#58744a', '#70845a', '#344b35'][i % 4];
+    ctx.fillStyle = shade; ctx.globalAlpha = 0.12 + Math.random() * 0.24;
+    ctx.beginPath(); ctx.arc(Math.random() * 128, Math.random() * 128, 1 + Math.random() * 4, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  return toTex(c);
+};
+
+export const roofTileTexture = () => {
+  const c = canvas(256, 128); const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#292e35'; ctx.fillRect(0, 0, 256, 128);
+  for (let y = 0; y < 128; y += 32) for (let x = (y / 32 % 2) * 24 - 24; x < 256; x += 48) {
+    const shade = 42 + Math.random() * 24;
+    ctx.fillStyle = `rgb(${shade},${shade + 4},${shade + 10})`;
+    ctx.beginPath(); ctx.roundRect(x + 2, y + 2, 44, 28, 8); ctx.fill();
+    ctx.strokeStyle = 'rgba(5,7,10,.58)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = 'rgba(205,213,222,.16)'; ctx.beginPath(); ctx.moveTo(x + 6, y + 5); ctx.lineTo(x + 38, y + 5); ctx.stroke();
+  }
+  return toTex(c, 2, 2);
 };
 
 export const shopTexture = (sign = '茶', wall = '#786f66', lit = true) => {

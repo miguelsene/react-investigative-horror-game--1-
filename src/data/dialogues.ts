@@ -506,7 +506,15 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   lunch_friend_3: { id: 'lunch_friend_3', speaker: 'Desconhecido', avatar: 'unknown_shadow', text: 'Então talvez sim.' },
 
   // Volta para casa
-  home_return: { id: 'home_return', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm', text: 'Chegou.' },
+  home_return: {
+    id: 'home_return', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm', text: 'Chegou. Como foi seu dia?',
+    options: [
+      { text: 'Foi normal.', nextNodeId: 'home_response_normal' },
+      { text: 'Estou cansada.', nextNodeId: 'home_response_tired' },
+      { text: 'Foi bom. Conversei com algumas pessoas.', nextNodeId: 'home_response_good' },
+      { text: 'Teve uma coisa estranha na escola.', nextNodeId: 'home_response_strange' },
+    ],
+  },
   home_response_normal: { id: 'home_response_normal', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Cheguei. Normal.', next: 'home_how' },
   home_response_tired: { id: 'home_response_tired', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Cheguei. Cansativo.', next: 'home_how' },
   home_response_good: { id: 'home_response_good', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Cheguei. Foi bom.', next: 'home_how' },
@@ -516,6 +524,16 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   home_strange_reply: { id: 'home_strange_reply', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm', text: 'Então não precisa saber agora.', next: 'home_how' },
   home_how: { id: 'home_how', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm', text: 'Pode me ajudar com o jantar?' },
 
+  parents_question_open: {
+    id: 'parents_question_open', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm',
+    text: 'A diretora me contou que você conseguiu falar um pouco sobre o que está sentindo. Fico feliz que tenha encontrado alguém disposto a ouvir.',
+    next: 'parents_question',
+  },
+  parents_question_guarded: {
+    id: 'parents_question_guarded', speaker: 'Chiyo (Avó)', avatar: 'grandma_quiet',
+    text: 'Soube que preferiu guardar para si o que está acontecendo. Não precisa me explicar agora; quero que saiba que pode contar comigo.',
+    next: 'parents_question',
+  },
   parents_question: {
     id: 'parents_question', speaker: 'Chiyo (Avó)', avatar: 'grandma_quiet',
     text: 'Você ainda sente falta deles?',
@@ -578,7 +596,50 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   },
   bedtime_reading_sleep: {
     id: 'bedtime_reading_sleep', speaker: 'Pensamento', avatar: 'gabriela_calm',
-    text: 'Fecho o livro. Apago a luz do abajur. Deito na cama.',
+    text: 'O gato preto se enrosca ao lado da cama. Fecho o livro, apago o abajur e deixo o dia voltar uma última vez.',
+    next: 'bedtime_reflection_1',
+  },
+
+  bedtime_reflection_1: {
+    id: 'bedtime_reflection_1', speaker: 'Pensamento', avatar: 'gabriela_calm',
+    text: 'Biologia, matemática, química, física. As notas ficaram boas. A diretora percebeu que algo estava errado, a enfermeira tentou ajudar e o professor me mostrou o laboratório. Ainda estou tentando entender que tipo de dia foi este.',
+    next: 'bedtime_reflection_2',
+  },
+  bedtime_reflection_2: {
+    id: 'bedtime_reflection_2', speaker: 'Pensamento', avatar: 'gabriela_calm',
+    text: 'A avó falou do meu pai e do vovô enquanto preparávamos o macarrão. Pensei no que contei à diretora, no que escondi da enfermeira e em como as minhas respostas mudaram as conversas de hoje.',
+    next: 'bedtime_reflection_3',
+  },
+  bedtime_reflection_3: {
+    id: 'bedtime_reflection_3', speaker: 'Pensamento', avatar: 'gabriela_calm',
+    text: 'Watson está dormindo. Eu também devia dormir. Amanhã posso perguntar mais à avó.',
+  },
+
+  anomaly_morning_1: {
+    id: 'anomaly_morning_1', speaker: 'Pensamento', avatar: 'gabriela_calm',
+    text: 'A manhã seguinte. A casa cheira a arroz recém-feito. Desço até a cozinha.',
+    next: 'anomaly_morning_2',
+  },
+  anomaly_morning_2: {
+    id: 'anomaly_morning_2', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm',
+    text: 'Bom dia, querida. Dormiu bem?',
+    options: [
+      { text: 'Sim. O gato ficou comigo a noite toda.', nextNodeId: 'anomaly_morning_cat' },
+      { text: 'Mais ou menos. Estava pensando no dia de ontem.', nextNodeId: 'anomaly_morning_day' },
+      { text: 'Acho que sim. Você está bem, vó?', nextNodeId: 'anomaly_morning_grandma' },
+    ],
+  },
+  anomaly_morning_cat: { id: 'anomaly_morning_cat', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Sim. O gato ficou comigo a noite toda.', next: 'anomaly_morning_glitch' },
+  anomaly_morning_day: { id: 'anomaly_morning_day', speaker: 'Gabriela', avatar: 'gabriela_inquisitive', text: 'Mais ou menos. Estava pensando no dia de ontem.', next: 'anomaly_morning_glitch' },
+  anomaly_morning_grandma: { id: 'anomaly_morning_grandma', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Acho que sim. Você está bem, vó?', next: 'anomaly_morning_glitch' },
+  anomaly_morning_glitch: {
+    id: 'anomaly_morning_glitch', speaker: 'Chiyo (Avó)', avatar: 'grandma_quiet',
+    text: 'Eu estou bem. Só... Gabriela, você está ouvindo esse silêncio?', soundCue: 'sting',
+    next: 'anomaly_morning_end',
+  },
+  anomaly_morning_end: {
+    id: 'anomaly_morning_end', speaker: 'Pensamento', avatar: 'gabriela_shock',
+    text: 'As paredes se apagam. Uma cópia minha aparece, depois outra. Seis rostos repetem meus movimentos. Preciso acertar o ritmo e fugir.',
   },
 
   // Segunda noite
@@ -823,6 +884,33 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   },
 
   // Enfermaria: Reiko Arai
+  // Novas conversas da manhã na escola: as escolhas ficam registradas para
+  // alterar a reação da avó na conversa do jantar.
+  director_akiyama: {
+    id: 'director_akiyama', speaker: 'Desconhecido', speakerTitle: 'Diretora Akiyama', avatar: 'unknown_shadow',
+    text: 'Gabriela, sua professora disse que você parece distante. E agora está olhando para mim como se já soubesse o que vou perguntar. Está acontecendo alguma coisa?',
+    options: [
+      { text: 'Contar que tenho dormido mal e que os relógios de casa pararam.', nextNodeId: 'director_honest', setFlag: 'director_trust', flagValue: 'honest' },
+      { text: 'Dizer que está tudo normal e mudar de assunto.', nextNodeId: 'director_closed', setFlag: 'director_trust', flagValue: 'closed' },
+    ],
+  },
+  director_honest: { id: 'director_honest', speaker: 'Diretora Akiyama', avatar: 'unknown_shadow', text: 'Obrigada por confiar em mim. Vou deixar a enfermaria avisada para fazer seu exame de rotina. Se precisar conversar, minha porta está aberta.' },
+  director_closed: { id: 'director_closed', speaker: 'Diretora Akiyama', avatar: 'unknown_shadow', text: 'Tudo bem. Não vou insistir, mas vou pedir à enfermeira que faça seu exame de rotina. Às vezes ajuda começar pelo básico.' },
+  nurse_checkup: {
+    id: 'nurse_checkup', speaker: 'Desconhecido', speakerTitle: 'Reiko Arai (Enfermeira)', avatar: 'unknown_shadow',
+    text: 'A diretora pediu um exame de rotina. Você está com dificuldade para dormir? Pode responder com sinceridade; isto fica entre nós.',
+    options: [
+      { text: 'Falar sobre o sono e a sensação de que há alguém me copiando.', nextNodeId: 'nurse_checkup_open', setFlag: 'nurse_answer', flagValue: 'open' },
+      { text: 'Dizer que é só cansaço e que prefiro não conversar.', nextNodeId: 'nurse_checkup_private', setFlag: 'nurse_answer', flagValue: 'private' },
+    ],
+  },
+  nurse_checkup_open: { id: 'nurse_checkup_open', speaker: 'Reiko Arai', avatar: 'unknown_shadow', text: 'Vou anotar apenas que você está cansada. Essa sensação deve ser assustadora. Se voltar, venha falar comigo, combinado?' },
+  nurse_checkup_private: { id: 'nurse_checkup_private', speaker: 'Reiko Arai', avatar: 'unknown_shadow', text: 'Entendo. Seus sinais estão normais. Descanse os olhos antes da aula de informática.' },
+  computer_lab_mission: {
+    id: 'computer_lab_mission', speaker: 'Pensamento', avatar: 'gabriela_analytical',
+    text: 'A professora pediu para entrar no terminal da escola e abrir o exercício da aula. A tela piscou: ERRO DE SINCRONIZAÇÃO — CÓDIGO 0317. O horário do telefone da noite passada.',
+    gabrielaAnalysis: 'O erro não parece pertencer ao sistema escolar. Mesmo assim, registrei a ocorrência antes de começar o exercício.',
+  },
   nurse_reiko: {
     id: 'nurse_reiko', speaker: 'Desconhecido', speakerTitle: 'Reiko Arai (Enfermeira)', avatar: 'unknown_shadow',
     text: 'Está tudo bem, Sabrina? Você parece pálida e com olheiras fundas.',
@@ -1037,4 +1125,72 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
     text: 'Fotografia em preto e branco dos anos 1960 mostrando o antigo pátio.',
     gabrielaAnalysis: 'Ao fundo, onde hoje fica o bicicletário, existia uma construção de madeira com telhado tradicional. Ela foi demolida sem deixar registros na planta atual.',
   },
+
+  // Pensamentos próprios ao examinar cada detalhe da escola.
+  entrance_shoe_rack: { id: 'entrance_shoe_rack', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'Os sapatos estão alinhados por tamanho. Trocar os meus pelos internos virou um gesto automático, quase uma pequena fronteira entre a rua e a escola.', gabrielaAnalysis: 'O par de Emi está molhado. Ela deve ter vindo correndo debaixo da chuva.' },
+  entrance_info_board: { id: 'entrance_info_board', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'O quadro reúne avisos de clubes, horários e uma lista de objetos perdidos. A rotina de todo mundo cabe em folhas coloridas.', gabrielaAnalysis: 'Um bilhete sem assinatura pede que alguém devolva um guarda-chuva azul. A letra parece tremida.' },
+  entrance_umbrella: { id: 'entrance_umbrella', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'Guarda-chuvas pingam no suporte e deixam um cheiro de tecido úmido no ar. O meu continua seco; por enquanto, a chuva ficou do lado de fora.' },
+  courtyard_shrine: { id: 'courtyard_shrine', speaker: 'Pensamento', avatar: 'gabriela_inquisitive', text: 'O pequeno santuário parece mais antigo que os prédios ao redor. Mesmo com o barulho do corredor, aqui o silêncio parece ter espaço próprio.', gabrielaAnalysis: 'A corda foi trocada recentemente. Alguém ainda cuida deste lugar.' },
+  courtyard_tree: { id: 'courtyard_tree', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A árvore cobre metade do pátio. As folhas balançam devagar, e por um instante consigo respirar sem pensar no próximo compromisso.', gabrielaAnalysis: 'Há iniciais entalhadas na casca. Algumas são tão antigas que quase desapareceram.' },
+  courtyard_stone: { id: 'courtyard_stone', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'Uma pedra lisa, colocada diante do santuário. A chuva desenhou um caminho escuro em sua superfície.', gabrielaAnalysis: 'A marca circular no topo parece ter sido feita por muitas mãos apoiadas ali.' },
+  corridor_notices_main: { id: 'corridor_notices_main', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'Provas, clubes e avisos do festival disputam o mesmo espaço. Tento ler tudo de uma vez, como se alguma informação pudesse explicar o meu cansaço.', gabrielaAnalysis: 'O horário do clube de fotografia foi alterado à mão, mas ninguém escreveu quando.' },
+  corridor_trophy_case: { id: 'corridor_trophy_case', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'Os troféus devolvem pequenos reflexos distorcidos do corredor. Imagino quantas pessoas passaram por aqui para comemorar uma vitória.', gabrielaAnalysis: 'O prêmio mais antigo não tem placa com nomes. Só o ano: 1974.' },
+  corridor_fire_extinguisher: { id: 'corridor_fire_extinguisher', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'O lacre vermelho está intacto e a inspeção ainda está no prazo. Uma coisa simples que posso conferir e entender.', gabrielaAnalysis: 'Preciso parar de procurar sinais em tudo.' },
+  corridor_clock: { id: 'corridor_clock', speaker: 'Pensamento', avatar: 'gabriela_shock', text: 'O ponteiro dos segundos dá um salto irregular. Prendo a respiração até ele continuar andando.', gabrielaAnalysis: 'Não está marcando 03:17. Ainda assim, olhei duas vezes.' },
+  secretary_desk: { id: 'secretary_desk', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A mesa de Mei está impecável, exceto por uma caneca de chá esquecida ao lado do telefone. Ela parece estar trabalhando desde cedo.', gabrielaAnalysis: 'Os formulários estão separados em pilhas por turma. Eu gostaria que minha cabeça também pudesse se organizar assim.' },
+  secretary_filing_cabinet: { id: 'secretary_filing_cabinet', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'As gavetas têm etiquetas alinhadas e datas bem legíveis. Arquivos guardam versões de nós que já nem lembramos.', gabrielaAnalysis: 'Uma gaveta está entreaberta. No cartão: “Fujimoto, Satomi”.' },
+  secretary_phone: { id: 'secretary_phone', speaker: 'Pensamento', avatar: 'gabriela_shock', text: 'O telefone está silencioso, mas o fio balança levemente, como se alguém tivesse acabado de soltá-lo.', gabrielaAnalysis: 'Talvez tenha sido só a corrente de ar da porta.' },
+  computer_lab_main_pc: { id: 'computer_lab_main_pc', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'O computador principal demora a iniciar e mostra as mesmas linhas de erro de antes. A sala cheira a plástico aquecido e poeira.', gabrielaAnalysis: 'Anoto o código. Se aparecer de novo, vou comparar os horários.' },
+  computer_lab_printer: { id: 'computer_lab_printer', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A impressora puxou uma folha torta e deixou uma faixa cinza no papel. Até as máquinas parecem ter começado o dia sem dormir.', gabrielaAnalysis: 'O papel está em branco, mas há uma marca funda como se alguém tivesse escrito sobre a folha de cima.' },
+  computer_lab_server: { id: 'computer_lab_server', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'O servidor vibra baixo dentro do armário ventilado. A luz verde pisca num ritmo constante.', gabrielaAnalysis: 'Por alguns segundos, a luz falha sempre no mesmo intervalo. Registro isso também.' },
+  art_room_paintings: { id: 'art_room_paintings', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'As pinturas deixam o corredor parecer menos rígido. Há cores que eu nunca escolheria, mas não consigo parar de olhar para elas.', gabrielaAnalysis: 'Uma paisagem chuvosa parece retratar a rua da minha casa.' },
+  art_room_sculpture: { id: 'art_room_sculpture', speaker: 'Pensamento', avatar: 'gabriela_inquisitive', text: 'A escultura é feita de argila rachada e fios de cobre. Parece frágil, embora esteja firme sobre a base.', gabrielaAnalysis: 'A artista deixou uma impressão digital no barro, bem no centro.' },
+  art_room_easel: { id: 'art_room_easel', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A tela ainda está quase vazia. Há apenas o contorno de uma casa e uma janela aberta.', gabrielaAnalysis: 'Tenho a sensação de já ter visto essa janela, mas não consigo lembrar onde.' },
+  art_room_supplies: { id: 'art_room_supplies', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'Pincéis limpos de um lado, os usados do outro. Hana cuida das ferramentas como se cada uma tivesse uma função insubstituível.', gabrielaAnalysis: 'O vermelho escuro no pote secou nas bordas. Parece mais marrom sob esta luz.' },
+  classroom_blackboard: { id: 'classroom_blackboard', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'Restaram contas apagadas pela metade no quadro. O pó de giz forma nuvens finas junto à moldura.', gabrielaAnalysis: 'Alguém desenhou um relógio no canto e apagou os ponteiros.' },
+  classroom_teacher_desk: { id: 'classroom_teacher_desk', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'Há uma pilha de provas corrigidas e uma maçã embrulhada num guardanapo. A professora deve chegar a qualquer momento.', gabrielaAnalysis: 'Uma prova ficou virada para baixo. A nota escrita no verso está coberta.' },
+  classroom_class_board: { id: 'classroom_class_board', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'O quadro mostra as tarefas da turma em letras cuidadosas. Informática, leitura e uma revisão de matemática.', gabrielaAnalysis: 'A anotação de hoje foi escrita com uma tinta diferente das outras.' },
+  classroom_storage_closet: { id: 'classroom_storage_closet', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'O armário guarda cartolinas, caixas de giz e material para o festival. Tudo parece ter sido recolocado às pressas.', gabrielaAnalysis: 'Uma caixa está etiquetada com o nome da turma de 1974.' },
+  infirmary_examination_table: { id: 'infirmary_examination_table', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'O papel descartável da maca está esticado sem nenhuma dobra. Deitar aqui faria o cansaço parecer oficial.', gabrielaAnalysis: 'A enfermeira percebe quando tento fingir que estou bem.' },
+  infirmary_medical_cabinet: { id: 'infirmary_medical_cabinet', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'Frascos e curativos estão organizados por tamanho. Uma lista na porta lembra Reiko de conferir o estoque.', gabrielaAnalysis: 'O reflexo no vidro duplica as etiquetas por um instante.' },
+  infirmary_rest_bed: { id: 'infirmary_rest_bed', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'O leito tem um cobertor azul dobrado no pé. O quarto é quieto o bastante para ouvir a chuva na janela.', gabrielaAnalysis: 'Eu poderia fechar os olhos por um minuto. Só um.' },
+  infirmary_first_aid_kit: { id: 'infirmary_first_aid_kit', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'O kit está lacrado e preso à parede, pronto para uma emergência pequena ou grande.', gabrielaAnalysis: 'É reconfortante saber exatamente onde encontrar ajuda.' },
+  library_desk: { id: 'library_desk', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A mesa de Yumi tem uma luminária de luz quente e cartões de empréstimo empilhados com cuidado.', gabrielaAnalysis: 'Ela sempre deixa um espaço livre para eu apoiar os livros.' },
+  library_armchair: { id: 'library_armchair', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A poltrona afunda um pouco no meio. Parece guardar o formato de quem costuma ler ali por horas.', gabrielaAnalysis: 'Se eu sentar, talvez me esqueça da aula por alguns minutos.' },
+  library_date_book: { id: 'library_date_book', speaker: 'Pensamento', avatar: 'gabriela_shock', text: 'A data 17/03 está anotada na margem de um livro que não foi emprestado este semestre.', gabrielaAnalysis: 'A mesma data aparece no verso de uma fotografia antiga da minha família.' },
+  cafeteria_table_w: { id: 'cafeteria_table_w', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A mesa está cheia de marcas de copos e riscos pequenos. Imagino as conversas que ficaram pela metade entre uma aula e outra.', gabrielaAnalysis: 'Alguém gravou uma estrelinha perto da borda.' },
+  cafeteria_table_e: { id: 'cafeteria_table_e', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A mesa do outro lado está mais limpa, mas há migalhas escondidas junto ao banco. Talvez o intervalo ainda não tenha acabado para alguém.', gabrielaAnalysis: 'O lugar diante de mim está vazio. Não sei por que isso parece um convite.' },
+  corridor_banner_w: { id: 'corridor_banner_w', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A faixa do festival balança quando alguém passa correndo. As cores vivas quase escondem o céu cinzento do lado de fora.', gabrielaAnalysis: 'Emi ajudou a pintar estas letras; reconheço o traço apressado.' },
+  corridor_banner_e: { id: 'corridor_banner_e', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'A outra faixa anuncia apresentações e barracas. Por um segundo, consigo imaginar este corredor cheio de música.', gabrielaAnalysis: 'Talvez eu consiga aproveitar o festival se parar de esperar que algo dê errado.' },
+  annex_cafeteria: { id: 'annex_cafeteria', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'O balcão do refeitório ainda não abriu, mas o cheiro de arroz recém-preparado ficou preso no ar. Meu estômago lembra que não tomei café.', gabrielaAnalysis: 'A cozinheira deixou a lista do almoço presa com um ímã em forma de gato.' },
+  annex_kitchen: { id: 'annex_kitchen', speaker: 'Pensamento', avatar: 'gabriela_analytical', text: 'Panelas, tábuas e conchas estão alinhadas na bancada. Aqui tudo tem um lugar definido, como na cozinha da minha avó.', gabrielaAnalysis: 'O vapor no vidro da janela desenhou um círculo que desaparece devagar.' },
+  annex_storage: { id: 'annex_storage', speaker: 'Pensamento', avatar: 'gabriela_inquisitive', text: 'As prateleiras guardam caixas de papel, bandejas e enfeites que sobraram do último festival.', gabrielaAnalysis: 'Uma caixa pesa mais do que deveria. O rótulo diz apenas “fotografias”.' },
+  sabrina_desk_seat: { id: 'sabrina_desk_seat', speaker: 'Pensamento', avatar: 'gabriela_calm', text: 'Minha carteira fica perto o bastante do quadro para enxergar tudo, mas longe da janela. Deixei o caderno alinhado com a borda, como sempre.', gabrielaAnalysis: 'Há um risco novo na madeira, bem ao lado do meu nome. Não lembro de tê-lo feito.' },
+  chat_mio: { id: 'chat_mio', speaker: 'Desconhecido', speakerTitle: 'Mio Kurosawa', avatar: 'unknown_shadow', text: 'Você veio devolver aquele romance? Eu guardei outro para você, mas não sabia se ainda estava com vontade de ler.', options: [{ text: 'Perguntar qual livro ela escolheu.', nextNodeId: 'chat_mio_book' }, { text: 'Dizer que hoje está difícil se concentrar.', nextNodeId: 'chat_mio_tired' }] },
+  chat_mio_book: { id: 'chat_mio_book', speaker: 'Desconhecido', speakerTitle: 'Mio Kurosawa', avatar: 'unknown_shadow', text: 'Um mistério curtinho, sem mortes. Pensei que seria bom para uma manhã chuvosa.', gabrielaAnalysis: 'Ela sempre lembra do que eu gosto, mesmo quando eu esqueço de responder às mensagens.' },
+  chat_mio_tired: { id: 'chat_mio_tired', speaker: 'Desconhecido', speakerTitle: 'Mio Kurosawa', avatar: 'unknown_shadow', text: 'Então deixa para outro dia. Posso ficar aqui com você um pouco, sem precisar conversar.' },
+  chat_aya: { id: 'chat_aya', speaker: 'Desconhecido', speakerTitle: 'Aya Minamoto', avatar: 'unknown_shadow', text: 'Eu travei nesta questão de matemática. Você consegue me mostrar por onde começar?', options: [{ text: 'Explicar o primeiro passo.', nextNodeId: 'chat_aya_help' }, { text: 'Sugerir que ela confira as anotações da aula.', nextNodeId: 'chat_aya_notes' }] },
+  chat_aya_help: { id: 'chat_aya_help', speaker: 'Desconhecido', speakerTitle: 'Aya Minamoto', avatar: 'unknown_shadow', text: 'Ah, agora entendi! Eu estava tentando resolver tudo de uma vez. Obrigada, Gabriela.' },
+  chat_aya_notes: { id: 'chat_aya_notes', speaker: 'Desconhecido', speakerTitle: 'Aya Minamoto', avatar: 'unknown_shadow', text: 'Boa ideia. Minha letra fica horrível quando anoto correndo, mas talvez eu consiga decifrar.' },
+  chat_ren: { id: 'chat_ren', speaker: 'Desconhecido', speakerTitle: 'Ren Watanabe', avatar: 'unknown_shadow', text: 'A professora ainda não chegou. Você também está esperando a aula começar?', options: [{ text: 'Perguntar se ele está animado para o festival.', nextNodeId: 'chat_ren_festival' }, { text: 'Dizer que prefere que a aula comece logo.', nextNodeId: 'chat_ren_class' }] },
+  chat_ren_festival: { id: 'chat_ren_festival', speaker: 'Desconhecido', speakerTitle: 'Ren Watanabe', avatar: 'unknown_shadow', text: 'Vou ajudar na barraca de jogos. Se aparecer por lá, guardo uma tentativa para você.' },
+  chat_ren_class: { id: 'chat_ren_class', speaker: 'Desconhecido', speakerTitle: 'Ren Watanabe', avatar: 'unknown_shadow', text: 'Você é a única pessoa que conheço que diz isso antes da primeira aula.' },
+  chat_sora: { id: 'chat_sora', speaker: 'Desconhecido', speakerTitle: 'Sora Yamamoto', avatar: 'unknown_shadow', text: 'Tirei fotos do festival ontem. A chuva deixou os reflexos bonitos, mas metade saiu tremida.', options: [{ text: 'Perguntar se ela fotografou a escola antiga.', nextNodeId: 'chat_sora_old' }, { text: 'Dizer que gostaria de ver as fotos.', nextNodeId: 'chat_sora_show' }] },
+  chat_sora_old: { id: 'chat_sora_old', speaker: 'Desconhecido', speakerTitle: 'Sora Yamamoto', avatar: 'unknown_shadow', text: 'A ala antiga? Sim. Uma foto ficou estranha: parece ter alguém na janela, mas não tinha ninguém lá quando olhei.' },
+  chat_sora_show: { id: 'chat_sora_show', speaker: 'Desconhecido', speakerTitle: 'Sora Yamamoto', avatar: 'unknown_shadow', text: 'Claro! Depois da aula eu te mostro. Só não repara na minha mochila cheia de lentes.' },
+  chat_nana: { id: 'chat_nana', speaker: 'Desconhecido', speakerTitle: 'Nana Suzuki', avatar: 'unknown_shadow', text: 'Você viu o episódio novo? A protagonista acorda sem lembrar do que sonhou.', options: [{ text: 'Dizer que não assistiu.', nextNodeId: 'chat_nana_no' }, { text: 'Perguntar como termina.', nextNodeId: 'chat_nana_end' }] },
+  chat_nana_no: { id: 'chat_nana_no', speaker: 'Desconhecido', speakerTitle: 'Nana Suzuki', avatar: 'unknown_shadow', text: 'Sem problema, eu não vou contar nada. Talvez a gente possa assistir juntas no fim de semana.' },
+  chat_nana_end: { id: 'chat_nana_end', speaker: 'Desconhecido', speakerTitle: 'Nana Suzuki', avatar: 'unknown_shadow', text: 'Ela encontra uma pista no próprio quarto! Mas parei aí, prometo. Você está com uma cara estranha... dormiu bem?' },
+  chat_hana: { id: 'chat_hana', speaker: 'Desconhecido', speakerTitle: 'Hana Yoshida', avatar: 'unknown_shadow', text: 'Estou tentando pintar a luz da janela sem deixar o resto da sala escuro demais.', options: [{ text: 'Dizer que as cores parecem vivas.', nextNodeId: 'chat_hana_praise' }, { text: 'Perguntar por que ela escolheu aquele quarto.', nextNodeId: 'chat_hana_why' }] },
+  chat_hana_praise: { id: 'chat_hana_praise', speaker: 'Desconhecido', speakerTitle: 'Hana Yoshida', avatar: 'unknown_shadow', text: 'Obrigada. Queria que parecesse um lugar de verdade, daqueles em que alguém acabou de sair.' },
+  chat_hana_why: { id: 'chat_hana_why', speaker: 'Desconhecido', speakerTitle: 'Hana Yoshida', avatar: 'unknown_shadow', text: 'Não sei. Sonhei com ele, acho. Eu nunca tinha entrado naquela sala antes de hoje.' },
+  secretary_mei: { id: 'secretary_mei', speaker: 'Desconhecido', speakerTitle: 'Mei Chen, Secretária', avatar: 'unknown_shadow', text: 'Gabriela, você veio entregar algum formulário? A diretora está esperando você terminar o exame de rotina.', options: [{ text: 'Perguntar se chegou algum recado de casa.', nextNodeId: 'secretary_mei_message' }, { text: 'Dizer que está indo para a enfermaria.', nextNodeId: 'secretary_mei_nurse' }] },
+  secretary_mei_message: { id: 'secretary_mei_message', speaker: 'Desconhecido', speakerTitle: 'Mei Chen, Secretária', avatar: 'unknown_shadow', text: 'Nenhum recado registrado. Se sua avó ligar, peço que anotem com cuidado desta vez.' },
+  secretary_mei_nurse: { id: 'secretary_mei_nurse', speaker: 'Desconhecido', speakerTitle: 'Mei Chen, Secretária', avatar: 'unknown_shadow', text: 'Obrigada. A Reiko está na sala; ela costuma ser mais gentil do que a maca parece.' },
+  computer_teacher: { id: 'computer_teacher', speaker: 'Desconhecido', speakerTitle: 'Professor Tanaka', avatar: 'unknown_shadow', text: 'Antes de abrir o exercício, confira se o terminal mostra seu nome. A rede está instável desde o início da manhã.', options: [{ text: 'Contar que apareceu o código 0317.', nextNodeId: 'computer_teacher_error' }, { text: 'Perguntar se o erro é comum.', nextNodeId: 'computer_teacher_common' }] },
+  computer_teacher_error: { id: 'computer_teacher_error', speaker: 'Desconhecido', speakerTitle: 'Professor Tanaka', avatar: 'unknown_shadow', text: '0317? Anote o horário e não reinicie a máquina. Vou conferir o servidor depois da chamada.' },
+  computer_teacher_common: { id: 'computer_teacher_common', speaker: 'Desconhecido', speakerTitle: 'Professor Tanaka', avatar: 'unknown_shadow', text: 'Não esse erro. Se a tela piscar de novo, me chame antes de tocar no teclado.' },
+  courtyard_keeper: { id: 'courtyard_keeper', speaker: 'Desconhecido', speakerTitle: 'Kashimoto, Zelador', avatar: 'unknown_shadow', text: 'O santuário já estava aqui quando a escola era só um terreno vazio. As crianças costumavam deixar folhas desenhadas aos pés da árvore.', options: [{ text: 'Perguntar se ele lembra da escola em 1974.', nextNodeId: 'courtyard_keeper_1974' }, { text: 'Agradecer e perguntar pela árvore.', nextNodeId: 'courtyard_keeper_tree' }] },
+  courtyard_keeper_1974: { id: 'courtyard_keeper_1974', speaker: 'Desconhecido', speakerTitle: 'Kashimoto, Zelador', avatar: 'unknown_shadow', text: 'Lembro do ano, sim. Havia uma menina que vinha cedo e conversava sozinha diante do portão. Os adultos diziam que era imaginação.' },
+  courtyard_keeper_tree: { id: 'courtyard_keeper_tree', speaker: 'Desconhecido', speakerTitle: 'Kashimoto, Zelador', avatar: 'unknown_shadow', text: 'Essa árvore não floresce todo ano. Quando floresce, as pétalas chegam até o corredor, mesmo sem vento.' },
 };

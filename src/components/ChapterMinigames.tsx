@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Panel } from './ui/Panel';
 import { soundManager } from '../audio/soundManager';
 import { ActivityId } from '../types/game';
@@ -65,12 +65,12 @@ const WATSON = [
 ] as const;
 
 const COOKING = [
-  { id: 'wash', label: 'Lavar legumes' },
-  { id: 'cut', label: 'Cortar os legumes' },
-  { id: 'rice', label: 'Preparar o arroz' },
-  { id: 'stir', label: 'Mexer a panela' },
-  { id: 'plates', label: 'Pôr os pratos' },
-  { id: 'serve', label: 'Servir' },
+  { id: 'water', label: 'Encher a panela e ferver a água' },
+  { id: 'salt', label: 'Temperar a água com sal' },
+  { id: 'pasta', label: 'Colocar o macarrão para cozinhar' },
+  { id: 'sauce', label: 'Mexer o molho enquanto conversamos' },
+  { id: 'drain', label: 'Escorrer o macarrão' },
+  { id: 'serve', label: 'Servir o jantar para as duas' },
 ] as const;
 
 const QUIZZES: Record<string, { question: string; answers: string[]; answer: number }[]> = {
@@ -126,11 +126,12 @@ const TITLES: Record<ActivityId, string> = {
   physics: 'Física',
 };
 
-const ChecklistGame: React.FC<{ items: readonly { id: string; label: string }[]; successLine: string; onDone: () => void }> = ({ items, successLine, onDone }) => {
+const ChecklistGame: React.FC<{ items: readonly { id: string; label: string }[]; successLine: string; onDone: () => void; commentary?: string[] }> = ({ items, successLine, onDone, commentary }) => {
   const [done, setDone] = useState<string[]>([]);
   const complete = done.length === items.length;
   return (
     <div className="space-y-2">
+      {commentary && <div className="mb-3 border-l border-amber-700/70 bg-amber-950/20 px-3 py-2 font-serif-jp text-sm italic leading-relaxed text-amber-100/90"><span className="mb-1 block text-[9px] not-italic tracking-[0.25em] text-amber-500">CHIYO, ENQUANTO COZINHAM</span>“{commentary[Math.min(done.length, commentary.length - 1)]}”</div>}
       {items.map((item) => {
         const checked = done.includes(item.id);
         return (
@@ -145,6 +146,63 @@ const ChecklistGame: React.FC<{ items: readonly { id: string; label: string }[];
       {complete && <div className="pt-4 text-right"><button onClick={onDone} className="inspection-action"><span>{successLine}</span> →</button></div>}
     </div>
   );
+};
+
+const BAG_ICONS: Record<(typeof BAG)[number]['id'], string> = {
+  bio: '📗', math: '📐', chem: '🧪', phys: '📘', case: '🖊️', calc: '🔢',
+  wallet: '👛', phone: '📱', bottle: '🧴', umbrella: '☂️', keys: '🔑',
+};
+
+const BagPackingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const [packed, setPacked] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [hovering, setHovering] = useState(false);
+  const packedRef = useRef(new Set<string>());
+  const pack = (id: string) => {
+    if (!BAG.some((item) => item.id === id) || packedRef.current.has(id)) return;
+    packedRef.current.add(id);
+    soundManager.playClockTick();
+    setPacked((items) => [...items, id]);
+    setSelected(null);
+  };
+  const drop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setHovering(false);
+    pack(event.dataTransfer.getData('text/plain'));
+  };
+  const complete = packed.length === BAG.length;
+  return <div className="grid gap-5 md:grid-cols-[1fr_0.9fr] font-serif-jp">
+    <section>
+      <p className="mb-3 text-xs tracking-widest text-neutral-400">ITENS PARA LEVAR · {packed.length}/{BAG.length}</p>
+      <div className="grid grid-cols-2 gap-2">
+        {BAG.map((item) => {
+          const isPacked = packed.includes(item.id);
+          return <button key={item.id} draggable={!isPacked}
+            onDragStart={(event) => { event.dataTransfer.setData('text/plain', item.id); event.dataTransfer.effectAllowed = 'move'; }}
+            onClick={() => !isPacked && setSelected(item.id)}
+            className={`flex items-center gap-2 border px-3 py-2 text-left text-xs transition ${isPacked ? 'border-emerald-900/50 text-neutral-600 opacity-50' : selected === item.id ? 'border-amber-300 bg-amber-950/40 text-white' : 'border-neutral-700 bg-neutral-900/70 text-neutral-200 hover:border-neutral-400'}`}>
+            <span className="text-lg">{BAG_ICONS[item.id]}</span><span>{item.label}</span>{isPacked && <span className="ml-auto text-emerald-400">✓</span>}
+          </button>;
+        })}
+      </div>
+      <p className="mt-3 text-[10px] text-neutral-500">Arraste os itens até a mochila ou selecione um item e clique nela.</p>
+    </section>
+    <section onDragOver={(event) => { event.preventDefault(); setHovering(true); }} onDragLeave={() => setHovering(false)} onDrop={drop}
+      onClick={() => selected && pack(selected)} onKeyDown={(event) => { if (selected && (event.key === 'Enter' || event.key === ' ')) pack(selected); }}
+      role="button" tabIndex={0} aria-label="Mochila: solte aqui os itens selecionados"
+      className={`relative flex min-h-64 cursor-pointer flex-col items-center justify-center overflow-hidden border-2 p-4 transition-colors ${hovering || selected ? 'border-amber-300 bg-amber-950/25' : 'border-dashed border-neutral-600 bg-neutral-900/40'}`}>
+      <div className="absolute top-5 h-8 w-16 rounded-t-2xl border-2 border-neutral-500" />
+      <div className="mt-8 flex h-36 w-40 flex-col items-center rounded-[2.5rem_2.5rem_1.2rem_1.2rem] border-2 border-amber-800/80 bg-gradient-to-br from-amber-950 to-neutral-950 p-3 shadow-[inset_0_0_28px_rgba(180,110,45,.12),0_12px_32px_rgba(0,0,0,.45)]">
+        <div className="mb-2 h-3 w-12 rounded-full border border-amber-700/70" />
+        <div className="grid w-full flex-1 grid-cols-4 content-center gap-1 rounded-lg border border-amber-900/60 bg-black/25 p-2">
+          {packed.map((id) => <span key={id} className="text-center text-xl" title={BAG.find((item) => item.id === id)?.label}>{BAG_ICONS[id as (typeof BAG)[number]['id']]}</span>)}
+          {Array.from({ length: BAG.length - packed.length }, (_, i) => <span key={`empty-${i}`} className="grid h-7 place-items-center text-xs text-amber-100/20">·</span>)}
+        </div>
+      </div>
+      <p className="mt-4 text-xs tracking-widest text-amber-100/80">{complete ? 'MOCHILA PRONTA' : 'SOLTE OS ITENS AQUI'}</p>
+    </section>
+    {complete && <div className="md:col-span-2 text-right"><button onClick={onDone} className="inspection-action">Fechar a mochila e descer →</button></div>}
+  </div>;
 };
 
 const QuizResult: React.FC<{ subject: string; score: number; total: number; onDone: (score: number, total: number) => void }> = ({ score, total, onDone }) => {
@@ -282,10 +340,23 @@ export const ChapterMinigames: React.FC<Props> = ({ activity, onClose, onComplet
   let body: React.ReactNode = null;
   if (activity === 'bed') body = <ChecklistGame items={CHECKLIST} successLine="Pronto." onDone={() => finish('A cama está arrumada.')} />;
   if (activity === 'desk') body = <ChecklistGame items={DESK} successLine="Mesa organizada." onDone={() => finish('A escrivaninha está organizada.')} />;
-  if (activity === 'bag') body = <ChecklistGame items={BAG} successLine="Fechar a mochila." onDone={() => finish('A mochila está pronta.')} />;
+  if (activity === 'bag') body = <BagPackingGame onDone={() => finish('A mochila está pronta.')} />;
   if (activity === 'uniform') body = <ChecklistGame items={[{ id: 'uniform', label: 'Trocar de roupa e dobrar o pijama' }]} successLine="Pronto." onDone={() => finish('Uniforme preparado.')} />;
   if (activity === 'watson') body = <ChecklistGame items={WATSON} successLine="Bom garoto." onDone={() => finish('Watson foi alimentado.')} />;
-  if (activity === 'cooking') body = <ChecklistGame items={COOKING} successLine="Servir o jantar." onDone={() => finish('O jantar está pronto.')} />;
+  if (activity === 'cooking') body = <ChecklistGame
+    items={COOKING}
+    successLine="Servir o jantar."
+    onDone={() => finish('O jantar está pronto.')}
+    commentary={[
+      'Seu pai sempre dizia que macarrão era a comida perfeita para quando a gente precisava conversar.',
+      'Ele mexia o molho devagar e me contava tudo o que tinha acontecido no trabalho.',
+      'Seu avô ensinou a ele esta receita. Os dois discutiam sobre quanto alho colocar.',
+      'Sinto falta de ouvir a chave do seu pai na porta e os dois rindo na cozinha.',
+      'Também sinto falta do seu avô. Há noites em que ainda guardo lugar para ele à mesa.',
+      'Obrigada por me ouvir falar deles, querida. Às vezes a saudade precisa de companhia.',
+      'Está pronto. Vamos jantar juntas, como fazíamos quando eles estavam aqui.',
+    ]}
+  />;
   if (activity === 'biology' || activity === 'math' || activity === 'chemistry' || activity === 'physics') {
     body = <Quiz subject={activity} onDone={(score, total) => {
       const grade = gradeForScore(score, total);
