@@ -464,7 +464,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   clock_317_avó: { id: 'clock_317_avó', speaker: 'Chiyo (Avó)', avatar: 'grandma_quiet', text: 'Eu sei.', next: 'clock_answer_ok' },
 
   // Escola
-  emi_greeting: { id: 'emi_greeting', speaker: 'Desconhecido', avatar: 'unknown_shadow', text: 'Sabrina!', next: 'emi_homework' },
+  emi_greeting: { id: 'emi_greeting', speaker: 'Desconhecido', avatar: 'unknown_shadow', text: 'Gabriela!', next: 'emi_homework' },
   emi_homework: {
     id: 'emi_homework', speaker: 'Desconhecido', avatar: 'unknown_shadow',
     text: 'Você fez o trabalho?',
@@ -546,7 +546,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   },
   parents_daily: { id: 'parents_daily', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Todos os dias.', next: 'parents_daily_2' },
   parents_daily_2: { id: 'parents_daily_2', speaker: 'Chiyo (Avó)', avatar: 'grandma_quiet', text: 'Eu também.', next: 'parents_daily_3' },
-  parents_daily_3: { id: 'parents_daily_3', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Cinco anos.', next: 'parents_daily_4' },
+  parents_daily_3: { id: 'parents_daily_3', speaker: 'Gabriela', avatar: 'gabriela_calm', text: 'Um ano.', next: 'parents_daily_4' },
   parents_daily_4: { id: 'parents_daily_4', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm', text: 'Algumas pessoas continuam fazendo parte de nós mesmo depois que partem.', next: 'grandfather_question' },
   parents_sometimes: { id: 'parents_sometimes', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm', text: 'Às vezes é suficiente.', next: 'parents_sometimes_2' },
   parents_sometimes_2: { id: 'parents_sometimes_2', speaker: 'Chiyo (Avó)', avatar: 'grandma_warm', text: 'A saudade não precisa ocupar todos os dias para ser verdadeira.', next: 'grandfather_question' },
@@ -734,7 +734,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   // Emi Takahashi diálogo detalhado no corredor
   emi_corridor_chat: {
     id: 'emi_corridor_chat', speaker: 'Desconhecido', speakerTitle: 'Emi Takahashi', avatar: 'unknown_shadow',
-    text: 'Sabrina! Você viu que a professora de Química mudou a prova para amanhã?',
+    text: 'Gabriela! Você viu que a professora de Química mudou a prova para amanhã?',
     options: [
       { text: '“Eu já sabia.”', nextNodeId: 'emi_chat_opt1' },
       { text: '“Você está brincando.”', nextNodeId: 'emi_chat_opt2' },
@@ -758,7 +758,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   // Biblioteca: Yumi Tanaka & Livros
   librarian_yumi: {
     id: 'librarian_yumi', speaker: 'Desconhecido', speakerTitle: 'Yumi Tanaka (Bibliotecária, 51)', avatar: 'unknown_shadow',
-    text: 'Sabrina. Bom dia. Você terminou aquele livro?',
+    text: 'Gabriela. Bom dia. Você terminou aquele livro?',
     options: [
       { text: '“Gostei.”', nextNodeId: 'yumi_opt1' },
       { text: '“O final foi previsível.”', nextNodeId: 'yumi_opt2' },
@@ -913,7 +913,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   },
   nurse_reiko: {
     id: 'nurse_reiko', speaker: 'Desconhecido', speakerTitle: 'Reiko Arai (Enfermeira)', avatar: 'unknown_shadow',
-    text: 'Está tudo bem, Sabrina? Você parece pálida e com olheiras fundas.',
+    text: 'Está tudo bem, Gabriela? Você parece pálida e com olheiras fundas.',
     options: [
       { text: '“Só dormi mal.”', nextNodeId: 'nurse_opt1' },
       { text: '“Preciso de um analgésico.”', nextNodeId: 'nurse_opt2' },
@@ -941,7 +941,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   // Secretaria: Michiko Watanabe
   secretary_michiko: {
     id: 'secretary_michiko', speaker: 'Desconhecido', speakerTitle: 'Michiko Watanabe (Secretária)', avatar: 'unknown_shadow',
-    text: 'Sabrina... sua avó Chiyo ligou para a sua casa hoje de manhã?',
+    text: 'Gabriela... sua avó Chiyo ligou para a sua casa hoje de manhã?',
     options: [
       { text: '“Não. Por quê?”', nextNodeId: 'secretary_reply' },
       { text: '“O telefone de casa está mudo.”', nextNodeId: 'secretary_reply' },
@@ -963,7 +963,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   // Sala de Artes: Hana Fujimoto
   art_hana: {
     id: 'art_hana', speaker: 'Desconhecido', speakerTitle: 'Hana Fujimoto (Clube de Arte)', avatar: 'unknown_shadow',
-    text: 'Sabrina! Você ficou ótima parada sob a luz da janela. Posso desenhar você?',
+    text: 'Gabriela! Você ficou ótima parada sob a luz da janela. Posso desenhar você?',
     options: [
       { text: '“Agora?”', nextNodeId: 'hana_opt1' },
       { text: '“Não.”', nextNodeId: 'hana_opt2' },
@@ -1003,7 +1003,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   // Quadra de Esportes: Daichi Mori
   soccer_daichi: {
     id: 'soccer_daichi', speaker: 'Desconhecido', speakerTitle: 'Daichi Mori (Futebol)', avatar: 'unknown_shadow',
-    text: 'Sabrina! Você vai assistir ao nosso amistoso contra Kitano na sexta?',
+    text: 'Gabriela! Você vai assistir ao nosso amistoso contra Kitano na sexta?',
     options: [
       { text: '“Talvez.”', nextNodeId: 'daichi_opt1' },
       { text: '“Não gosto muito de futebol.”', nextNodeId: 'daichi_opt2' },
@@ -1038,7 +1038,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   // Máquina de bebidas escolar
   vending_school_chat: {
     id: 'vending_school_chat', speaker: 'Desconhecido', speakerTitle: 'Emi Takahashi', avatar: 'unknown_shadow',
-    text: 'Você sempre compra chá verde gelado, Sabrina!',
+    text: 'Você sempre compra chá verde gelado, Gabriela!',
     next: 'vending_school_chat_2',
   },
   vending_school_chat_2: {
@@ -1054,7 +1054,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
   // Colegas da sala 2-B
   ken_talk: {
     id: 'ken_talk', speaker: 'Desconhecido', speakerTitle: 'Ken (Colega)', avatar: 'unknown_shadow',
-    text: 'Sabrina, você fez a tarefa de Matemática número quatro?',
+    text: 'Gabriela, você fez a tarefa de Matemática número quatro?',
     options: [
       { text: '“Sim.”', nextNodeId: 'ken_opt1' },
       { text: '“Não me peça para copiar.”', nextNodeId: 'ken_opt2' },
@@ -1081,7 +1081,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
 
   mika_talk: {
     id: 'mika_talk', speaker: 'Desconhecido', speakerTitle: 'Mika (Colega)', avatar: 'unknown_shadow',
-    text: 'Sabrina, você estudou para a revisão de Química?',
+    text: 'Gabriela, você estudou para a revisão de Química?',
     next: 'mika_talk_2',
   },
   mika_talk_2: {
@@ -1096,7 +1096,7 @@ export const DIALOGUE_NODES: Record<string, DialogueNode> = {
 
   ryo_talk: {
     id: 'ryo_talk', speaker: 'Desconhecido', speakerTitle: 'Ryo (Colega)', avatar: 'unknown_shadow',
-    text: 'Sabrina, você está viva?',
+    text: 'Gabriela, você está viva?',
     next: 'ryo_talk_2',
   },
   ryo_talk_2: {

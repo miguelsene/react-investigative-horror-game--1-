@@ -23,9 +23,9 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     portrait: 'emi',
     speaker: 'Desconhecido',
     x: -4, z: 1.5,
-    bubble: 'Sabrina! A prova de Química mudou!',
+    bubble: 'Gabriela! A prova de Química mudou!',
     talk: [
-      { id: 'emi_1', speaker: 'Emi Takahashi', speakerTitle: 'Colega · 2-B', text: 'Sabrina! Você viu que a professora de Química mudou a prova?', next: 'emi_2' },
+      { id: 'emi_1', speaker: 'Emi Takahashi', speakerTitle: 'Colega · 2-B', text: 'Gabriela! Você viu que a professora de Química mudou a prova?', next: 'emi_2' },
       { id: 'emi_2', speaker: 'Emi Takahashi', speakerTitle: 'Colega · 2-B', text: 'Para amanhã. Trinta por cento da nota.', next: 'emi_choice' },
     ],
   },
@@ -38,7 +38,7 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     x: 2, z: 1.5,
     bubble: 'Posso copiar a quatro de matemática?',
     talk: [
-      { id: 'ken_1', speaker: 'Ken', speakerTitle: 'Colega · 2-B', text: 'Sabrina, você fez a tarefa de Matemática número quatro?', next: 'ken_choice' },
+      { id: 'ken_1', speaker: 'Ken', speakerTitle: 'Colega · 2-B', text: 'Gabriela, você fez a tarefa de Matemática número quatro?', next: 'ken_choice' },
     ],
   },
   {
@@ -62,9 +62,9 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     portrait: 'unknown',
     speaker: 'Desconhecido',
     x: 8, z: 1.5,
-    bubble: 'Sabrina, você está viva?',
+    bubble: 'Gabriela, você está viva?',
     talk: [
-      { id: 'ryo_1', speaker: 'Ryo', speakerTitle: 'Colega · 2-B', text: 'Sabrina, você está viva?', next: 'ryo_2' },
+      { id: 'ryo_1', speaker: 'Ryo', speakerTitle: 'Colega · 2-B', text: 'Gabriela, você está viva?', next: 'ryo_2' },
       { id: 'ryo_2', speaker: 'Gabriela', text: 'Infelizmente.', next: 'ryo_3' },
       { id: 'ryo_3', speaker: 'Ryo', speakerTitle: 'Colega · 2-B', text: '...Foi uma piada?', next: 'ryo_4' },
       { id: 'ryo_4', speaker: 'Gabriela', text: 'Não.' },
@@ -77,9 +77,9 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     portrait: 'unknown',
     speaker: 'Desconhecido',
     x: -8, z: -2.5,
-    bubble: 'Sabrina. Bom dia.',
+    bubble: 'Gabriela. Bom dia.',
     talk: [
-      { id: 'yumi_1', speaker: 'Yumi Tanaka', speakerTitle: 'Bibliotecária · 51', text: 'Sabrina. Bom dia. Você terminou aquele livro?', next: 'yumi_choice' },
+      { id: 'yumi_1', speaker: 'Yumi Tanaka', speakerTitle: 'Bibliotecária · 51', text: 'Gabriela. Bom dia. Você terminou aquele livro?', next: 'yumi_choice' },
     ],
   },
   {
@@ -91,7 +91,7 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     x: -5, z: -2.5,
     bubble: 'Está tudo bem?',
     talk: [
-      { id: 'reiko_1', speaker: 'Reiko Arai', speakerTitle: 'Enfermeira', text: 'Está tudo bem, Sabrina? Você parece pálida e com olheiras fundas.', next: 'reiko_choice' },
+      { id: 'reiko_1', speaker: 'Reiko Arai', speakerTitle: 'Enfermeira', text: 'Está tudo bem, Gabriela? Você parece pálida e com olheiras fundas.', next: 'reiko_choice' },
     ],
   },
   {
@@ -103,7 +103,7 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     x: -2, z: -2.5,
     bubble: 'Sua avó ligou?',
     talk: [
-      { id: 'michiko_1', speaker: 'Michiko Watanabe', speakerTitle: 'Secretária', text: 'Sabrina... sua avó Chiyo ligou para a sua casa hoje de manhã?', next: 'michiko_2' },
+      { id: 'michiko_1', speaker: 'Michiko Watanabe', speakerTitle: 'Secretária', text: 'Gabriela... sua avó Chiyo ligou para a sua casa hoje de manhã?', next: 'michiko_2' },
       { id: 'michiko_2', speaker: 'Gabriela', text: 'Não. Por quê?', next: 'michiko_3' },
       { id: 'michiko_3', speaker: 'Michiko Watanabe', speakerTitle: 'Secretária', text: 'Nada, querida. Achei ter ouvido a voz dela na linha externa por volta das sete... devo ter me enganado.', analysis: 'Ela olhou para o registro telefônico e guardou o bloco de recados com rapidez.' },
     ],
@@ -117,7 +117,7 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     x: 8, z: -2.5,
     bubble: 'Posso desenhar você?',
     talk: [
-      { id: 'hana_1', speaker: 'Hana Fujimoto', speakerTitle: 'Clube de Arte', text: 'Sabrina! Você ficou ótima parada sob a luz da janela. Posso desenhar você?', next: 'hana_choice' },
+      { id: 'hana_1', speaker: 'Hana Fujimoto', speakerTitle: 'Clube de Arte', text: 'Gabriela! Você ficou ótima parada sob a luz da janela. Posso desenhar você?', next: 'hana_choice' },
     ],
   },
   {
@@ -129,7 +129,7 @@ export const SCHOOL_NPCS: SchoolNpc[] = [
     x: 4, z: -2.5,
     bubble: 'Vai ver o jogo na sexta?',
     talk: [
-      { id: 'daichi_1', speaker: 'Daichi Mori', speakerTitle: 'Futebol', text: 'Sabrina! Você vai assistir ao nosso amistoso contra Kitano na sexta?', next: 'daichi_choice' },
+      { id: 'daichi_1', speaker: 'Daichi Mori', speakerTitle: 'Futebol', text: 'Gabriela! Você vai assistir ao nosso amistoso contra Kitano na sexta?', next: 'daichi_choice' },
     ],
   },
   {

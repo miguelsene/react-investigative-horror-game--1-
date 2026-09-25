@@ -180,7 +180,8 @@ export type ActivityId =
   | 'biology'
   | 'math'
   | 'chemistry'
-  | 'physics';
+  | 'physics'
+  | 'art';
 
 export interface InteractiveObject {
   id: string;

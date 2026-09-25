@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Anim } from './models';
 import * as T from './textures';
@@ -1385,7 +1385,7 @@ const shelfLoader = new GLTFLoader();
     const npcSprites: { sprite: THREE.Sprite; npc: SchoolNpc; x: number; z: number; phase: number; collider: { x: number; z: number; w: number; d: number } }[] = [];
     // simple NPCs for demo
     npcs.push({ id: 'entrance_student', name: 'Aluno apressado', role: 'Estudante', x: -21, z: 0.5, lines: ['Bom dia!'], dialogueNodeId: 'school_entrance_student' });
-    npcs.push({ id: 'yumi_tanaka', name: 'Yumi Tanaka', role: 'Bibliotecária', x: 0.5, z: -7.5, lines: ['Sabrina. Bom dia.'], dialogueNodeId: 'librarian_yumi' });
+    npcs.push({ id: 'yumi_tanaka', name: 'Yumi Tanaka', role: 'Bibliotecária', x: 0.5, z: -7.5, lines: ['Gabriela. Bom dia.'], dialogueNodeId: 'librarian_yumi' });
 
     npcs.push(
       { id: 'emi_hall', name: 'Emi Takahashi', role: 'Estudante', x: -4.5, z: 2.2, lines: ['Você viu os cartazes do festival?'] },
@@ -1401,7 +1401,7 @@ const shelfLoader = new GLTFLoader();
       { id: 'walk_sora', name: 'Sora', role: 'Estudante', x: 4, z: 2.7, lines: ['Esqueci meu guarda-chuva.'] },
       { id: 'walk_ren', name: 'Ren', role: 'Estudante', x: 12, z: 1.2, lines: ['A professora já chegou?'] },
       { id: 'walk_nana', name: 'Nana', role: 'Estudante', x: 18, z: 2.8, lines: ['Vou pegar um livro antes da aula.'] },
-      { id: 'walk_haru', name: 'Haru', role: 'Estudante', x: 23, z: 1.2, lines: ['Bom dia, Sabrina.'] },
+      { id: 'walk_haru', name: 'Haru', role: 'Estudante', x: 23, z: 1.2, lines: ['Bom dia, Gabriela.'] },
     );
 
     npcs.forEach((npc, idx) => {
@@ -1426,7 +1426,7 @@ const shelfLoader = new GLTFLoader();
     // Additional NPCs for more life in the school
     // Students hanging around different areas
     npcs.push(
-      { id: 'chat_mio', name: 'Mio Kurosawa', role: 'Amiga de Gabriela', x: -12, z: -7.5, lines: ['Ei, Sabrina! Vi que você gosta de livros.'], dialogueNodeId: 'chat_mio' },
+      { id: 'chat_mio', name: 'Mio Kurosawa', role: 'Amiga de Gabriela', x: -12, z: -7.5, lines: ['Ei, Gabriela! Vi que você gosta de livros.'], dialogueNodeId: 'chat_mio' },
       { id: 'chat_aya', name: 'Aya Minamoto', role: 'Estudante', x: 10.5, z: -15.5, lines: ['Você pode me ajudar com este problema de matemática?'], dialogueNodeId: 'chat_aya' },
       { id: 'chat_ren', name: 'Ren Watanabe', role: 'Estudante', x: 15.8, z: -14.2, lines: ['A professora vai chegar em breve.'], dialogueNodeId: 'chat_ren' },
       { id: 'chat_sora', name: 'Sora Yamamoto', role: 'Clube de Fotografia', x: -22.5, z: -14.8, lines: ['Liest meus fotos do festival ontem.'], dialogueNodeId: 'chat_sora' },
@@ -1436,7 +1436,7 @@ const shelfLoader = new GLTFLoader();
 
     // Nurse NPC in infirmary
     npcs.push(
-      { id: 'nurse_reiko', name: 'Reiko Arai', role: 'Enfermeira', x: 3.5, z: -14.5, lines: ['Está tudo bem, Sabrina? Você parece pálida.'], dialogueNodeId: 'nurse_reiko' }
+      { id: 'nurse_reiko', name: 'Reiko Arai', role: 'Enfermeira', x: 3.5, z: -14.5, lines: ['Está tudo bem, Gabriela? Você parece pálida.'], dialogueNodeId: 'nurse_reiko' }
     );
 
     // Secretary NPC

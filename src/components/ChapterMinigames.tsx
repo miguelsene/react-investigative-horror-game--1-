@@ -58,14 +58,142 @@ const WATSON = [
   { id: 'call', label: 'Chamar Watson' },
 ] as const;
 
-const COOKING = [
-  { id: 'water', label: 'Encher a panela e ferver a água' },
-  { id: 'salt', label: 'Temperar a água com sal' },
-  { id: 'pasta', label: 'Colocar o macarrão para cozinhar' },
-  { id: 'sauce', label: 'Mexer o molho enquanto conversamos' },
-  { id: 'drain', label: 'Escorrer o macarrão' },
-  { id: 'serve', label: 'Servir o jantar para as duas' },
+const PAINT_ROUNDS = [
+  { title: 'Paisagem de verão', prompt: 'Pinte um jardim no verão: céu, vegetação e um ponto de cor quente.', seconds: 120, wanted: ['#8bc5dc', '#67935c', '#e3a45b'] },
+  { title: 'A janela da escola', prompt: 'Pinte uma janela com luz do fim da tarde e algo visível do lado de fora.', seconds: 60, wanted: ['#e7b66d', '#657a9b', '#81a36a'] },
+  { title: 'Casa sob a chuva', prompt: 'Em pouco tempo, represente uma casa, o céu e um detalhe que pareça acolhedor.', seconds: 30, wanted: ['#52647c', '#9a6670', '#e4c989'] },
 ] as const;
+const PAINT_COLORS = [
+  { name: 'Azul céu', color: '#8bc5dc' }, { name: 'Verde folha', color: '#67935c' },
+  { name: 'Laranja verão', color: '#e3a45b' }, { name: 'Ouro do entardecer', color: '#e7b66d' },
+  { name: 'Azul da janela', color: '#657a9b' }, { name: 'Verde do jardim', color: '#81a36a' },
+  { name: 'Índigo chuva', color: '#52647c' }, { name: 'Rosa casa', color: '#9a6670' },
+  { name: 'Luz acolhedora', color: '#e4c989' }, { name: 'Amarelo luz', color: '#e3c779' },
+  { name: 'Laranja', color: '#e38c54' }, { name: 'Rosa flor', color: '#cf8192' },
+  { name: 'Creme', color: '#e8dfc6' }, { name: 'Marrom madeira', color: '#795b45' },
+];
+
+const PaintingGame: React.FC<{ onDone: (score: number, total: number, grade: Grade) => void }> = ({ onDone }) => {
+  const [round, setRound] = useState(0);
+  const [seconds, setSeconds] = useState(PAINT_ROUNDS[0].seconds);
+  const [selected, setSelected] = useState(PAINT_COLORS[0].color);
+  const [brushSize, setBrushSize] = useState(10);
+  const [isEraser, setIsEraser] = useState(false);
+  const [scores, setScores] = useState<number[]>([]);
+  const [finished, setFinished] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawingRef = useRef(false);
+  const usedColorsRef = useRef(new Set<string>());
+  const roundFinishedRef = useRef(false);
+  const current = PAINT_ROUNDS[round];
+  const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return null;
+    const bounds = canvas.getBoundingClientRect();
+    return { context, x: (event.clientX - bounds.left) * canvas.width / bounds.width, y: (event.clientY - bounds.top) * canvas.height / bounds.height };
+  };
+  const paintStart = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); drawingRef.current = true;
+    const p = point(event); if (!p) return;
+    p.context.beginPath(); p.context.moveTo(p.x, p.y); p.context.lineTo(p.x + 0.1, p.y + 0.1);
+    p.context.lineWidth = brushSize; p.context.lineCap = 'round'; p.context.lineJoin = 'round';
+    p.context.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over'; p.context.strokeStyle = selected; p.context.stroke();
+    if (!isEraser) usedColorsRef.current.add(selected);
+  };
+  const paintMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return;
+    const p = point(event); if (!p) return;
+    p.context.lineTo(p.x, p.y); p.context.stroke();
+    if (!isEraser) usedColorsRef.current.add(selected);
+  };
+  const clearCanvas = () => { const canvas = canvasRef.current; canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height); usedColorsRef.current.clear(); };
+  const finishRound = () => {
+    if (roundFinishedRef.current || finished) return;
+    roundFinishedRef.current = true;
+    const canvas = canvasRef.current; const context = canvas?.getContext('2d');
+    const pixels = context && canvas ? context.getImageData(0, 0, canvas.width, canvas.height).data : new Uint8ClampedArray();
+    let painted = 0; for (let i = 3; i < pixels.length; i += 4) if (pixels[i] > 16) painted++;
+    const coverage = pixels.length ? painted / (pixels.length / 4) : 0;
+    const matching = current.wanted.filter((color) => usedColorsRef.current.has(color)).length;
+    const score = Math.min(100, Math.round(coverage * 70 + matching * 10 + Math.min(usedColorsRef.current.size, 4) * 2.5));
+    const nextScores = [...scores, score]; setScores(nextScores);
+    if (round + 1 >= PAINT_ROUNDS.length) setFinished(true);
+    else {
+      setRound(round + 1); setSeconds(PAINT_ROUNDS[round + 1].seconds); setSelected(PAINT_COLORS[0].color); setIsEraser(false);
+      clearCanvas(); roundFinishedRef.current = false;
+    }
+  };
+  useEffect(() => {
+    if (finished) return;
+    const timer = window.setInterval(() => setSeconds((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [round, finished]);
+  useEffect(() => { if (seconds === 0) finishRound(); }, [seconds, round, finished, scores]);
+  const total = scores.reduce((sum, value) => sum + value, 0);
+  const grade = gradeForScore(total, 300);
+  if (finished) return <div className="py-7 text-center font-serif-jp"><p className="text-[10px] tracking-[.3em] text-neutral-500">PORTFÓLIO DA AULA</p><p className="mt-3 font-title text-7xl text-amber-100">{grade}</p><p className="mt-2 text-sm text-neutral-300">{total}/300 pontos · três estudos concluídos</p><button className="inspection-action mt-7" onClick={() => onDone(total, 300, grade)}>Guardar os quadros →</button></div>;
+  return <div className="-mx-2 font-serif-jp sm:-mx-4">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded border border-neutral-700 bg-[#151515] px-4 py-3"><div><p className="text-[10px] tracking-[.25em] text-amber-300">QUADRO {round + 1}/3 · {current.title}</p><p className="mt-1 text-sm text-neutral-200">{current.prompt}</p></div><div className="text-right"><span className={`font-mono text-2xl ${seconds <= 10 ? 'text-red-300' : 'text-neutral-100'}`}>{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span><p className="text-[9px] tracking-widest text-neutral-500">TEMPO RESTANTE</p></div></div>
+    <div className="overflow-hidden rounded-lg border border-neutral-700 bg-[#29251f] shadow-[0_12px_35px_rgba(0,0,0,.45)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/40 bg-[#37322b] px-3 py-2"><div className="flex flex-wrap items-center gap-1.5">{PAINT_COLORS.map(({ name, color }) => <button key={color} title={name} aria-label={`Tinta: ${name}`} onClick={() => { setSelected(color); setIsEraser(false); }} className={`h-7 w-7 rounded-full border-2 shadow ${selected === color && !isEraser ? 'border-white ring-2 ring-amber-300/60' : 'border-black/60'}`} style={{ backgroundColor: color }} />)}</div><div className="flex items-center gap-2"><label className="text-[9px] tracking-widest text-neutral-300">PINCEL <input aria-label="Tamanho do pincel" type="range" min="3" max="34" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} className="ml-2 w-20 align-middle accent-amber-300" /></label><button onClick={() => setIsEraser((value) => !value)} className={`border px-2 py-1 text-[10px] ${isEraser ? 'border-white bg-white/15 text-white' : 'border-neutral-600 text-neutral-300'}`}>BORRACHA</button><button onClick={clearCanvas} className="border border-neutral-600 px-2 py-1 text-[10px] text-neutral-300">LIMPAR</button></div></div>
+      <div className="bg-[#e9dfc9] p-2 sm:p-4"><canvas ref={canvasRef} width={1200} height={680} aria-label={`Tela de pintura livre: ${current.title}`} onPointerDown={paintStart} onPointerMove={paintMove} onPointerUp={(event) => { drawingRef.current = false; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onPointerCancel={() => { drawingRef.current = false; }} className="block h-[42vh] min-h-64 max-h-[31rem] w-full touch-none cursor-crosshair bg-[#f4eddd] shadow-inner" /></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/40 bg-[#37322b] px-3 py-2"><span className="text-[9px] tracking-[.16em] text-neutral-400">ARRASTE O PINCEL SOBRE A TELA · {isEraser ? 'BORRACHA ATIVA' : `COR ${PAINT_COLORS.find((paint) => paint.color === selected)?.name ?? 'PERSONALIZADA'}`}</span><button onClick={finishRound} className="border border-amber-200/70 bg-amber-100 px-5 py-2 text-xs font-bold tracking-[.2em] text-[#292117] transition hover:bg-white">PRONTO · PRÓXIMO QUADRO →</button></div>
+    </div>
+  </div>;
+};
+
+const COOKING_MOMENTS = [
+  'Seu pai sempre dizia que macarrão era a comida perfeita para quando a gente precisava conversar.',
+  'Ele mexia o molho devagar e me contava tudo o que tinha acontecido no trabalho.',
+  'Seu avô ensinou a ele esta receita. Os dois discutiam sobre quanto alho colocar.',
+  'Sinto falta de ouvir a chave do seu pai na porta e os dois rindo na cozinha.',
+  'Também sinto falta do seu avô. Há noites em que ainda guardo lugar para ele à mesa.',
+  'Obrigada por me ouvir falar deles, querida. Às vezes a saudade precisa de companhia.',
+  'Está pronto. Vamos jantar juntas, como fazíamos quando eles estavam aqui.',
+];
+const CookingGame: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const [step, setStep] = useState(0);
+  const [stirs, setStirs] = useState(0);
+  const [feedback, setFeedback] = useState('A avó deixou os ingredientes separados. Vamos preparar o macarrão juntas.');
+  const steps = [
+    { id: 'water', name: 'Encher a panela', target: 'Abra a torneira para encher a panela de água.' },
+    { id: 'salt', name: 'Temperar', target: 'Pegue o saleiro e tempere a água.' },
+    { id: 'pasta', name: 'Adicionar o macarrão', target: 'Coloque o macarrão na panela.' },
+    { id: 'stir', name: 'Mexer o molho', target: `Mexa o molho devagar (${stirs}/3).` },
+    { id: 'drain', name: 'Escorrer', target: 'Use o escorredor junto à pia.' },
+    { id: 'serve', name: 'Servir', target: 'Sirva o jantar nos dois pratos.' },
+  ];
+  const perform = (action: string) => {
+    const expected = steps[step]?.id;
+    if (action !== expected) { setFeedback('A avó aponta para o próximo utensílio: ' + (steps[step]?.name ?? 'o jantar')); return; }
+    soundManager.playClockTick();
+    if (action === 'stir' && stirs < 2) { setStirs((count) => count + 1); setFeedback(COOKING_MOMENTS[Math.min(step + stirs, COOKING_MOMENTS.length - 1)]); return; }
+    const next = step + 1;
+    setStep(next); setStirs(0);
+    setFeedback(COOKING_MOMENTS[Math.min(next, COOKING_MOMENTS.length - 1)]);
+  };
+  const current = steps[step];
+  return <div className="font-serif-jp">
+    <div className="mb-3 flex items-center justify-between"><span className="text-[10px] tracking-[.25em] text-amber-300">COZINHA · PREPARO DO JANTAR</span><span className="text-xs text-neutral-400">{Math.min(step, steps.length)}/{steps.length}</span></div>
+    <div className="relative mx-auto h-64 max-w-2xl overflow-hidden rounded-lg border border-amber-900/60 bg-gradient-to-b from-[#28313b] via-[#4a3730] to-[#34251f] shadow-inner sm:h-72">
+      <div className="absolute inset-x-0 top-0 h-10 border-b border-white/10 bg-[#46515a]" />
+      <div className="absolute left-[7%] top-5 h-8 w-16 border-4 border-[#bfcbd0] bg-sky-200/20" />
+      <div className="absolute left-[30%] top-4 grid grid-cols-3 gap-1"><span className="h-4 w-4 rounded-full bg-[#d6c3a0]"/><span className="h-4 w-4 rounded-full bg-[#d6c3a0]"/><span className="h-4 w-4 rounded-full bg-[#d6c3a0]"/><span className="mx-auto h-5 w-5 rounded-full bg-[#d6c3a0]"/></div>
+      <div className="absolute inset-x-0 bottom-0 h-16 border-t-4 border-[#8a6246] bg-[#614737]" />
+      <button onClick={() => perform('water')} className={`absolute left-[8%] top-[46%] grid h-14 w-16 place-items-center rounded border text-xs ${current?.id === 'water' ? 'border-sky-200 bg-sky-900/70 text-white animate-pulse' : 'border-white/15 bg-black/25 text-neutral-300'}`} aria-label="Torneira da pia">PIA<br/>🚰</button>
+      <button onClick={() => perform('salt')} className={`absolute left-[31%] top-[51%] grid h-12 w-12 place-items-center rounded border text-xs ${current?.id === 'salt' ? 'border-amber-100 bg-amber-800/70 text-white animate-pulse' : 'border-white/15 bg-black/25 text-neutral-300'}`} aria-label="Saleiro">🧂<br/>SAL</button>
+      <button onClick={() => perform('pasta')} className={`absolute left-[46%] top-[53%] grid h-12 w-16 place-items-center rounded border text-xs ${current?.id === 'pasta' ? 'border-amber-100 bg-amber-800/70 text-white animate-pulse' : 'border-white/15 bg-black/25 text-neutral-300'}`} aria-label="Pacote de macarrão">▤<br/>MASSA</button>
+      <button onClick={() => perform('stir')} className={`absolute left-[64%] top-[43%] grid h-20 w-20 place-items-center rounded-full border-4 text-xs shadow-lg ${current?.id === 'stir' ? 'border-orange-200 bg-orange-800/75 text-white animate-pulse' : 'border-neutral-500 bg-neutral-800 text-neutral-300'}`} aria-label="Mexer a panela"><span className="text-2xl">{step >= 3 ? '🍝' : '♨'}</span><span>PANELA</span></button>
+      <button onClick={() => perform('drain')} className={`absolute left-[8%] top-[72%] grid h-10 w-20 place-items-center rounded border text-[10px] ${current?.id === 'drain' ? 'border-sky-100 bg-sky-900/70 text-white animate-pulse' : 'border-white/15 bg-black/30 text-neutral-300'}`} aria-label="Escorredor">ESCORREDOR</button>
+      <button onClick={() => perform('serve')} className={`absolute right-[9%] top-[70%] grid h-12 w-24 place-items-center rounded border text-[10px] ${current?.id === 'serve' ? 'border-emerald-100 bg-emerald-900/70 text-white animate-pulse' : 'border-white/15 bg-black/30 text-neutral-300'}`} aria-label="Pratos">{step >= 5 ? '🍽️ JANTAR' : 'DOIS PRATOS'}</button>
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] tracking-[.25em] text-amber-100/55">AVÓ CHIYO · GABRIELA · WATSON</div>
+    </div>
+    <p className="mt-3 text-center text-sm text-amber-100">{current?.target ?? 'O jantar está servido.'}</p>
+    <div className="mt-3 min-h-16 border-l border-amber-700/70 bg-amber-950/20 px-3 py-2 text-sm italic leading-relaxed text-amber-100/90"><span className="mb-1 block text-[9px] not-italic tracking-[.25em] text-amber-500">{step ? 'CHIYO, ENQUANTO COZINHAM' : 'GABRIELA'}</span>{feedback}</div>
+    {step >= steps.length && <div className="pt-4 text-right"><button onClick={onDone} className="inspection-action">Sentar para jantar →</button></div>}
+  </div>;
+};
 
 const QUIZZES: Record<string, { question: string; answers: string[]; answer: number }[]> = {
   biology: [
@@ -104,6 +232,7 @@ const QUIZZES: Record<string, { question: string; answers: string[]; answer: num
     { question: 'Aceleração positiva indica:', answers: ['Diminuição da velocidade', 'Aumento da velocidade', 'Repouso'], answer: 1 },
     { question: 'Qual destas é energia de movimento?', answers: ['Potencial', 'Térmica parada', 'Cinética'], answer: 2 },
   ],
+  art: [],
 };
 
 const TITLES: Record<ActivityId, string> = {
@@ -118,6 +247,7 @@ const TITLES: Record<ActivityId, string> = {
   math: 'Matemática',
   chemistry: 'Química',
   physics: 'Física',
+  art: 'Artes',
 };
 
 const ChecklistGame: React.FC<{ items: readonly { id: string; label: string }[]; successLine: string; onDone: () => void; commentary?: string[] }> = ({ items, successLine, onDone, commentary }) => {
@@ -392,20 +522,8 @@ export const ChapterMinigames: React.FC<Props> = ({ activity, onClose, onComplet
   if (activity === 'bag') body = <BagPackingGame onDone={() => finish('A mochila está pronta.')} />;
   if (activity === 'uniform') body = <ChecklistGame items={[{ id: 'uniform', label: 'Trocar de roupa e dobrar o pijama' }]} successLine="Pronto." onDone={() => finish('Uniforme preparado.')} />;
   if (activity === 'watson') body = <ChecklistGame items={WATSON} successLine="Bom garoto." onDone={() => finish('Watson foi alimentado.')} />;
-  if (activity === 'cooking') body = <ChecklistGame
-    items={COOKING}
-    successLine="Servir o jantar."
-    onDone={() => finish('O jantar está pronto.')}
-    commentary={[
-      'Seu pai sempre dizia que macarrão era a comida perfeita para quando a gente precisava conversar.',
-      'Ele mexia o molho devagar e me contava tudo o que tinha acontecido no trabalho.',
-      'Seu avô ensinou a ele esta receita. Os dois discutiam sobre quanto alho colocar.',
-      'Sinto falta de ouvir a chave do seu pai na porta e os dois rindo na cozinha.',
-      'Também sinto falta do seu avô. Há noites em que ainda guardo lugar para ele à mesa.',
-      'Obrigada por me ouvir falar deles, querida. Às vezes a saudade precisa de companhia.',
-      'Está pronto. Vamos jantar juntas, como fazíamos quando eles estavam aqui.',
-    ]}
-  />;
+  if (activity === 'cooking') body = <CookingGame onDone={() => finish('O jantar está pronto.')} />;
+  if (activity === 'art') body = <PaintingGame onDone={(score, total, grade) => finish(`Aula de artes concluída — nota ${grade} (${score}/${total}).`, { score, total, grade })} />;
   if (activity === 'biology' || activity === 'math' || activity === 'chemistry' || activity === 'physics') {
     body = <Quiz subject={activity} onDone={(score, total) => {
       const grade = gradeForScore(score, total);
@@ -414,7 +532,7 @@ export const ChapterMinigames: React.FC<Props> = ({ activity, onClose, onComplet
   }
 
   return (
-    <Panel title={TITLES[activity] ?? 'Atividade'} jp="æ—¥å¸¸" onClose={onClose} width={activity === 'bed' || activity === 'bag' ? 'max-w-4xl' : 'max-w-xl'} surfaceClassName={activity === 'bed' || activity === 'bag' ? 'minigame-pixel-panel' : ''}>
+    <Panel title={TITLES[activity] ?? 'Atividade'} jp="æ—¥å¸¸" onClose={onClose} width={activity === 'art' ? 'max-w-6xl' : activity === 'bed' || activity === 'bag' ? 'max-w-4xl' : 'max-w-xl'} surfaceClassName={activity === 'bed' || activity === 'bag' ? 'minigame-pixel-panel' : ''}>
       {body}
     </Panel>
   );

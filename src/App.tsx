@@ -28,7 +28,7 @@ import { INSPECTABLE_OBJECTS } from './data/clues';
 import { DIALOGUE_NODES } from './data/dialogues';
 import { ActivityId, InspectionObjectData, DialogueNode } from './types/game';
 import { CaseCompletedModal } from './components/CaseCompletedModal';
-import { Package, BookMarked, GitFork, Menu, Save, Check } from 'lucide-react';
+import { Package, BookMarked, GitFork, Menu, Save, Check, Clock3 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const gameState = useGameState();
@@ -49,6 +49,9 @@ export const App: React.FC = () => {
   const [foundClocks, setFoundClocks] = useState<string[]>([]);
   const [repairClockId, setRepairClockId] = useState<string | null>(null);
   const [worldArea, setWorldArea] = useState<'house' | 'street' | 'school' | 'schoolhall' | 'return' | 'dream'>('house');
+  const [devDreamPhase, setDevDreamPhase] = useState<'dialogue' | 'playing' | 'boss'>('dialogue');
+  const [devDreamRun, setDevDreamRun] = useState(0);
+  const [devTimeOverride, setDevTimeOverride] = useState<string | null>(null);
   const [routeProgress, setRouteProgress] = useState(0);
   const [grades, setGrades] = useState<Record<string, Grade>>({});
   const [isAreaLoading, setIsAreaLoading] = useState(false);
@@ -69,12 +72,13 @@ export const App: React.FC = () => {
     [],
   );
 
-  const subjectOrder: ActivityId[] = ['biology', 'math', 'chemistry', 'physics'];
+  const subjectOrder: ActivityId[] = ['biology', 'math', 'chemistry', 'physics', 'art'];
   const SUBJECT_LABELS: Record<string, string> = {
     biology: 'Biologia',
     math: 'Matemática',
     chemistry: 'Química',
     physics: 'Física',
+    art: 'Artes',
   };
   const nextSubject = useMemo(() => subjectOrder.find((s) => !grades[s]) ?? null, [grades]);
   const [crtEnabled, setCrtEnabled] = useState(true);
@@ -230,8 +234,9 @@ export const App: React.FC = () => {
 
   const [devPanelOpen, setDevPanelOpen] = useState(false);
 
-  const applyDevJump = useCallback((opts: { chapter: number; area: string; timePreset: string; customTime?: string }) => {
-    const { chapter, area, timePreset, customTime } = opts;
+  const applyDevJump = useCallback((opts: { chapter: number; area: string; timePreset: string; mission: string; customTime?: string }) => {
+    const { chapter, area, timePreset, mission, customTime } = opts;
+    setActiveDialogueNode(null); setActiveMinigame(null); setStreetThought(null); setMapDissolving(false); setIsSecondNightCutscene(false);
     gameState.selectChapter(chapter);
     // reset some story flags to provide a clean developer context
     gameState.setStoryFlags((p) => ({ ...p, developer_mode: true }));
@@ -268,6 +273,7 @@ export const App: React.FC = () => {
       gameState.setCurrentLocation('street_return');
     } else if (area === 'dream') {
       setWorldArea('dream');
+      setDevDreamPhase('dialogue'); setDevDreamRun((run) => run + 1);
       gameState.setStoryFlags((p) => ({ ...p, returned_from_school: true, dinner_done: true, activity_cooking: true, arrived_school: false, left_house_for_school: false, dream_scene_active: true }));
     }
 
@@ -292,10 +298,50 @@ export const App: React.FC = () => {
     } else if (timePreset === 'custom') {
       if (customTime) gameState.setCurrentTime(customTime);
     }
+    const presetTime: Record<string, string> = { morning: '07:00', school_morning: '07:28', school_dismissal: '15:30', night: '21:43' };
+    const selectedMoment = customTime || presetTime[timePreset] || gameState.currentTime;
+    setDevTimeOverride(selectedMoment || null);
+
+    const schoolMissionStages: Record<string, [boolean, boolean, boolean]> = {
+      director: [false, false, false], nurse: [true, false, false], computer: [true, true, false],
+    };
+    if (schoolMissionStages[mission]) {
+      const [directorDone, nurseDone, computerDone] = schoolMissionStages[mission];
+      gameState.setStoryFlags((p) => ({ ...p, school_director_done: directorDone, school_nurse_done: nurseDone, school_computer_done: computerDone }));
+      setGrades({});
+    }
+    const lessonProgress: Record<string, ActivityId[]> = {
+      biology: [], math: ['biology'], chemistry: ['biology', 'math'], physics: ['biology', 'math', 'chemistry'],
+      art: ['biology', 'math', 'chemistry', 'physics'],
+    };
+    if (lessonProgress[mission]) {
+      const completed = lessonProgress[mission];
+      setGrades(Object.fromEntries(completed.map((subject) => [subject, 'C'])) as Record<string, Grade>);
+      gameState.setStoryFlags((p) => ({
+        ...p, school_director_done: true, school_nurse_done: true, school_computer_done: true,
+        activity_biology: completed.includes('biology'), activity_math: completed.includes('math'),
+        activity_chemistry: completed.includes('chemistry'), activity_physics: completed.includes('physics'),
+        activity_art: completed.includes('art'),
+      }));
+    }
+    if (mission === 'dinner') {
+      setWorldArea('house'); gameState.setCurrentFloor(1); gameState.setCurrentLocation('kitchen');
+      gameState.setStoryFlags((p) => ({ ...p, returned_from_school: true, dinner_done: false, activity_cooking: false, activity_biology: true, activity_math: true, activity_chemistry: true, activity_physics: true, activity_art: true }));
+    } else if (mission === 'bedtime') {
+      setWorldArea('house'); gameState.setCurrentFloor(2); gameState.setCurrentLocation('bedroom');
+      gameState.setStoryFlags((p) => ({ ...p, returned_from_school: true, dinner_done: true, activity_cooking: true, next_morning_anomaly: false, activity_bed: true, activity_bag: true }));
+    } else if (mission === 'morning_anomaly') {
+      setWorldArea('house'); gameState.setCurrentFloor(2); gameState.setCurrentLocation('bedroom');
+      gameState.setStoryFlags((p) => ({ ...p, next_morning_anomaly: true, returned_from_school: true, dinner_done: true, activity_cooking: true, activity_bed: false, activity_bag: false, morning_talk: false }));
+    } else if (mission === 'shadow' || mission === 'chase' || mission === 'boss') {
+      const startPhase = mission === 'shadow' ? 'dialogue' : mission === 'chase' ? 'playing' : 'boss';
+      setWorldArea('dream'); setDevDreamPhase(startPhase); setDevDreamRun((run) => run + 1);
+      gameState.setStoryFlags((p) => ({ ...p, dream_scene_active: true, returned_from_school: true, dinner_done: true, activity_cooking: true }));
+    }
 
     // close panel after jump
     setDevPanelOpen(false);
-    showToast(`Dev jump: capítulo ${chapter}, ${area} @ ${gameState.currentTime}`);
+    showToast(`Dev jump: capítulo ${chapter}, ${area}, missão ${mission} @ ${selectedMoment}`);
   }, [gameState, showToast]);
 
   const handleStartGame = useCallback(
@@ -329,7 +375,7 @@ export const App: React.FC = () => {
       return;
     }
 
-    const schoolFinished = ['biology', 'math', 'chemistry', 'physics'].every((subject) => Boolean(gameState.storyFlags[`activity_${subject}`]));
+    const schoolFinished = ['biology', 'math', 'chemistry', 'physics', 'art'].every((subject) => Boolean(gameState.storyFlags[`activity_${subject}`]));
     if (gameState.storyFlags.arrived_school) {
       setWorldArea(schoolFinished ? 'school' : 'schoolhall');
     } else if (gameState.storyFlags.left_house_for_school) {
@@ -386,6 +432,7 @@ export const App: React.FC = () => {
     && clocksComplete;
 
   const derivedTime = useMemo(() => {
+    if (gameState.storyFlags.developer_mode && devTimeOverride) return devTimeOverride;
     if (activeDialogueNode?.id.startsWith('prologue_')) return '03:17';
     const roomTasks = ['activity_bed', 'activity_desk', 'activity_bag', 'activity_uniform'].filter(has).length;
     if (!talkedMorning) return roomTasks === 0 ? '06:20' : roomTasks < 4 ? '06:31' : '06:51';
@@ -396,15 +443,17 @@ export const App: React.FC = () => {
     if (worldArea === 'house') return '07:00';
     if (worldArea === 'street') return '07:28';
     if (!f.activity_biology || !f.activity_math || !f.activity_chemistry || !f.activity_physics) return '08:10';
+    if (!f.activity_art) return '16:32';
     if (!f.activity_cooking) return '18:07';
     return '21:43';
-  }, [activeDialogueNode, ateBreakfast, clocksComplete, f, has, homeReady, talkedMorning, worldArea]);
+  }, [activeDialogueNode, ateBreakfast, clocksComplete, devTimeOverride, f, gameState.storyFlags.developer_mode, has, homeReady, talkedMorning, worldArea]);
 
   const currentObjective = useMemo(() => {
     if (worldArea === 'schoolhall') {
       if (!has('school_director_done')) return 'Missão: converse com a diretora na secretaria.';
       if (!has('school_nurse_done')) return 'Missão: faça o exame de rotina na enfermaria.';
       if (!has('school_computer_done')) return 'Missão: use o computador principal no laboratório.';
+      if (nextSubject === 'art') return 'Missão: vá à sala de artes e termine o último estudo no cavalete.';
       return nextSubject ? `Missão: vá à sala 2-B para a aula de ${SUBJECT_LABELS[nextSubject]}.` : 'Missão concluída. Saia pelo corredor.';
     }
     if (has('next_morning_anomaly') && worldArea === 'house') {
@@ -423,6 +472,7 @@ export const App: React.FC = () => {
     if (!f.activity_math) return 'Complete a aula de Matemática.';
     if (!f.activity_chemistry) return 'Complete a aula de Química.';
     if (!f.activity_physics) return 'Complete a aula de Física.';
+    if (!f.activity_art) return 'Termine a aula de artes no cavalete.';
     if (!f.activity_cooking) return worldArea === 'return' ? 'Volte para casa e ajude sua avó com o jantar.' : 'Ajude sua avó a preparar o jantar.';
     if (!f.dinner_done) return 'Converse com sua avó durante o jantar.';
     return 'Suba para o quarto e descanse com o gato ao lado da cama.';
@@ -455,13 +505,19 @@ export const App: React.FC = () => {
       setGrades((previous) => ({ ...previous, [result.activity]: grade }));
       gameState.addNote(`${SUBJECT_LABELS[result.activity] ?? result.activity}: nota ${grade} (${result.score ?? 0}/${result.total ?? 0}).`);
       if (result.activity === 'physics') {
-        showToast('Aulas terminadas. Hora de voltar para casa.');
-        setWorldArea('return');
-        setRouteProgress(1);
-        setActiveDialogueNode(DIALOGUE_NODES['after_school_grades']);
+        showToast('A última atividade do dia é na sala de artes. Procure o cavalete.');
       } else {
         showToast(`${result.message} — siga para a próxima sala.`);
       }
+    }
+    if (result.activity === 'art') {
+      const grade = result.grade ?? 'C';
+      setGrades((previous) => ({ ...previous, art: grade }));
+      gameState.addNote(`Artes: nota ${grade} (${result.score ?? 0}/${result.total ?? 0}).`);
+      showToast('As aulas terminaram. Hora de voltar para casa.');
+      setWorldArea('return');
+      setRouteProgress(1);
+      setActiveDialogueNode(DIALOGUE_NODES['after_school_grades']);
     }
     gameState.saveGame();
   }, [gameState, showToast]);
@@ -637,12 +693,20 @@ export const App: React.FC = () => {
     [ateBreakfast, gameState, gameState.storyFlags, homeReady, showToast, talkedMorning, dlg]
   );
 
-      const anyModal = isEvidenceBoardOpen || isJournalOpen || isInventoryOpen || isSettingsOpen || isChapterSelectOpen || !!activeMinigame || clockHuntOpen || !!repairClockId;
+      const anyModal = isEvidenceBoardOpen || isJournalOpen || isInventoryOpen || isSettingsOpen || isChapterSelectOpen || !!activeMinigame || clockHuntOpen || !!repairClockId || devPanelOpen;
 
   useEffect(() => {
     const handleGlobalKeys = (e: KeyboardEvent) => {
       if (activeScreen !== 'gameplay') return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input,textarea,select')) return;
       const key = e.key.toLowerCase();
+      if (key === 't' && gameState.storyFlags.developer_mode) {
+        e.preventDefault();
+        setDevPanelOpen((open) => !open);
+        soundManager.playClockTick();
+        return;
+      }
       if (activeDialogueNode && key !== 'escape') return;
       if (key === 'i') {
         setIsInventoryOpen((p) => !p);
@@ -657,7 +721,8 @@ export const App: React.FC = () => {
         setIsInventoryOpen(false);
         setIsJournalOpen(false);
       } else if (key === 'escape') {
-        if (activeInspectionData) setActiveInspectionData(null);
+        if (devPanelOpen) setDevPanelOpen(false);
+        else if (activeInspectionData) setActiveInspectionData(null);
         else if (isEvidenceBoardOpen) setIsEvidenceBoardOpen(false);
         else if (isJournalOpen) setIsJournalOpen(false);
         else if (isInventoryOpen) setIsInventoryOpen(false);
@@ -668,7 +733,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, [activeScreen, activeInspectionData, isEvidenceBoardOpen, isJournalOpen, isInventoryOpen, isSettingsOpen, isChapterSelectOpen, activeDialogueNode]);
+  }, [activeScreen, activeInspectionData, isEvidenceBoardOpen, isJournalOpen, isInventoryOpen, isSettingsOpen, isChapterSelectOpen, activeDialogueNode, devPanelOpen, gameState.storyFlags.developer_mode]);
 
   const advanceDialogue = (nodeId: string | null) => {
     if (nodeId) {
@@ -775,10 +840,12 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {activeScreen === 'gameplay' && worldArea !== 'house' && gameState.storyFlags.developer_mode && <button className="hud-btn fixed right-5 top-5 z-[80] flex items-center gap-2" title="Alterar momento [T]" onClick={() => { soundManager.playClockTick(); setDevPanelOpen(true); }}><Clock3 className="h-4 w-4" /><span className="font-serif-jp text-[9px] tracking-[.2em]">MOMENTO · T</span></button>}
+
       {/* Developer Quick-Jump Panel */}
       {devPanelOpen && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center">
-          <div className="w-96 bg-[#0b0d10] border border-neutral-700 p-6 rounded-lg shadow-2xl">
+        <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-[min(24rem,100%)] overflow-y-auto rounded-lg border border-neutral-700 bg-[#0b0d10] p-6 shadow-2xl">
             <h3 className="font-title text-xl mb-3">Dev Quick Jump</h3>
             <div className="flex flex-col gap-2">
               <label className="text-sm">Capítulo</label>
@@ -786,30 +853,46 @@ export const App: React.FC = () => {
                 {[1,2,3,4,5].map((c) => <option key={c} value={c}>Capítulo {c}</option>)}
               </select>
 
-              <label className="text-sm">Área</label>
-              <select id="dev-area" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded">
-                <option value="house">Casa</option>
-                <option value="street">Rua (ida)</option>
-                <option value="schoolhall">Corredor da Escola</option>
-                <option value="school_director">Escola — missão da diretora</option>
-                <option value="school_nurse">Escola — exame na enfermaria</option>
-                <option value="school_computer">Escola — laboratório de informática</option>
-                <option value="school_class">Escola — aula liberada</option>
-                <option value="morning_anomaly">Manhã seguinte — rotina antes da dissolução</option>
-                <option value="school">Sala de Aula / Minigame</option>
-                <option value="return">Rua (volta)</option>
-                <option value="dream">Sonho / anomalia (Babylon.js)</option>
+            <label className="text-sm">Área</label>
+            <select id="dev-area" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded">
+                <option value="house">Casa — sala e cozinha</option>
+                <option value="street">Rua — caminho para a escola</option>
+                <option value="schoolhall">Escola — corredor</option>
+                <option value="school">Escola — boletim / resumo</option>
+                <option value="return">Rua — caminho de volta</option>
+                <option value="morning_anomaly">Casa — manhã da anomalia</option>
+                <option value="dream">Sonho — espaço branco</option>
               </select>
 
-              <label className="text-sm">Tempo / Preset</label>
+              <label className="mt-2 text-sm">Momento do dia</label>
               <select id="dev-time" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded">
                 <option value="morning">Manhã (07:00)</option>
                 <option value="school_morning">Saída para escola (07:28)</option>
                 <option value="school_dismissal">Final das aulas (15:30)</option>
                 <option value="night">Noite (21:43)</option>
-                <option value="custom">Custom</option>
+                <option value="custom">Horário personalizado</option>
               </select>
-              <input id="dev-custom-time" placeholder="HH:MM" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded" />
+              <input id="dev-custom-time" type="time" aria-label="Horário personalizado" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded text-neutral-100" />
+
+              <label className="mt-2 text-sm">Missão / ponto de início</label>
+              <select id="dev-mission" className="bg-[#0d0f12] border border-neutral-800 p-2 rounded">
+                <option value="current">Manter progresso atual</option>
+                <option value="director">Falar com a diretora</option>
+                <option value="nurse">Exame na enfermaria</option>
+                <option value="computer">Aula de informática</option>
+                <option value="biology">Aula de Biologia</option>
+                <option value="math">Aula de Matemática</option>
+                <option value="chemistry">Aula de Química</option>
+                <option value="physics">Aula de Física</option>
+                <option value="art">Aula de Artes · pintura</option>
+                <option value="dinner">Preparar o jantar com a avó</option>
+                <option value="bedtime">Reflexão antes de dormir</option>
+                <option value="morning_anomaly">Rotina da manhã seguinte</option>
+                <option value="shadow">Conversa com a sombra</option>
+                <option value="chase">Perseguição das cópias</option>
+                <option value="boss">Confronto com a versão gigante</option>
+              </select>
+              <p className="text-[10px] leading-relaxed text-neutral-500">O local define onde Gabriela aparece; a missão prepara as etapas anteriores necessárias para começar esse trecho.</p>
 
               <div className="flex justify-end gap-2 mt-3">
                 <button className="px-3 py-1 bg-neutral-800 border border-neutral-700 rounded" onClick={() => setDevPanelOpen(false)}>Fechar</button>
@@ -819,8 +902,9 @@ export const App: React.FC = () => {
                     const ch = Number((document.getElementById('dev-chapter') as HTMLSelectElement).value || 1);
                     const area = (document.getElementById('dev-area') as HTMLSelectElement).value || 'house';
                     const timePreset = (document.getElementById('dev-time') as HTMLSelectElement).value || 'morning';
+                    const mission = (document.getElementById('dev-mission') as HTMLSelectElement).value || 'current';
                     const customTime = (document.getElementById('dev-custom-time') as HTMLInputElement).value || undefined;
-                    applyDevJump({ chapter: ch, area, timePreset, customTime });
+                    applyDevJump({ chapter: ch, area, timePreset, mission, customTime });
                   }}
                 >Ir</button>
               </div>
@@ -875,6 +959,9 @@ export const App: React.FC = () => {
             <button className="hud-btn" title="Quadro de pistas [Q]" onClick={() => { soundManager.playClockTick(); setIsEvidenceBoardOpen(true); }}>
               <GitFork className="w-4 h-4" />
             </button>
+            {gameState.storyFlags.developer_mode && <button className="hud-btn" title="Alterar momento [T]" onClick={() => { soundManager.playClockTick(); setDevPanelOpen(true); }}>
+              <Clock3 className="w-4 h-4" />
+            </button>}
             <button className="hud-btn" title="Menu [ESC]" onClick={() => setIsSettingsOpen(true)}>
               <Menu className="w-4 h-4" />
             </button>
@@ -925,7 +1012,7 @@ export const App: React.FC = () => {
           />
           <div className="absolute top-5 left-6 z-20 pointer-events-none hud-shadow">
             <div className="font-title text-3xl tracking-[0.22em] text-neutral-100 leading-none">
-              07:{String(28 + Math.round(routeProgress * 18)).padStart(2, '0')}
+              {devTimeOverride ?? `07:${String(28 + Math.round(routeProgress * 18)).padStart(2, '0')}`}
             </div>
             <div className="mt-1.5 flex items-center gap-2"><span className="w-1.5 h-1.5 bg-red-500" /><span className="font-serif-jp text-[11px] tracking-[0.35em] text-neutral-300">SAKYO-KU · RUA</span></div>
           </div>
@@ -953,6 +1040,10 @@ export const App: React.FC = () => {
             cameraMotionEnabled={cameraMotionEnabled}
             onTriggerDialogue={(id, label) => {
               const flags = gameState.storyFlags;
+              if (id === 'art_room_easel' && nextSubject === 'art') {
+                setActiveMinigame('art');
+                return;
+              }
               if (id === 'director_akiyama' && flags.school_director_done) return showToast('A diretora já conversou com você hoje.');
               if (id === 'nurse_reiko' && !flags.school_director_done) return showToast('A diretora pediu para você passar primeiro na secretaria.');
               if (id === 'nurse_reiko' && flags.school_nurse_done) return showToast('O exame de rotina já foi concluído.');
@@ -976,20 +1067,24 @@ export const App: React.FC = () => {
                 showToast('As aulas de hoje terminaram.');
                 return;
               }
+              if (nextSubject === 'art') {
+                showToast('A aula final será na sala de artes. Interaja com o cavalete.');
+                return;
+              }
               setActiveMinigame(nextSubject);
             }}
           />
           <div className="absolute top-5 left-6 z-20 pointer-events-none hud-shadow">
-            <div className="font-title text-3xl tracking-[0.22em] text-neutral-100 leading-none">08:10</div>
+            <div className="font-title text-3xl tracking-[0.22em] text-neutral-100 leading-none">{devTimeOverride ?? '08:10'}</div>
             <div className="mt-1.5 flex items-center gap-2">
               <span className="w-1.5 h-1.5 bg-red-500" />
               <span className="font-serif-jp text-[11px] tracking-[0.35em] text-neutral-500">ESCOLA · CORREDOR</span>
             </div>
           </div>
-          <div className="absolute top-5 right-5 z-20 grid gap-2 w-52">
+          <div className={`absolute ${gameState.storyFlags.developer_mode ? 'top-16' : 'top-5'} right-5 z-20 grid gap-2 w-52`}>
             {subjectOrder.map((subject, index) => {
               const grade = grades[subject];
-              const labels: Record<string, string> = { biology: 'Biologia', math: 'Matemática', chemistry: 'Química', physics: 'Física' };
+              const labels: Record<string, string> = { biology: 'Biologia', math: 'Matemática', chemistry: 'Química', physics: 'Física', art: 'Artes' };
               const active = nextSubject === subject;
               return (
                 <div key={subject} className={`px-3 py-2 text-xs font-serif-jp border ${active ? 'border-white text-white bg-black/50' : 'border-neutral-800 text-neutral-500 bg-black/35'}`}>
@@ -1026,7 +1121,7 @@ export const App: React.FC = () => {
             }}
           />
           <div className="absolute top-5 left-6 z-20 pointer-events-none hud-shadow">
-            <div className="font-title text-3xl tracking-[0.22em] text-neutral-100 leading-none">16:43</div>
+            <div className="font-title text-3xl tracking-[0.22em] text-neutral-100 leading-none">{devTimeOverride ?? '16:43'}</div>
             <div className="mt-1.5 flex items-center gap-2"><span className="w-1.5 h-1.5 bg-red-500" /><span className="font-serif-jp text-[11px] tracking-[0.35em] text-neutral-300">VOLTA PARA CASA</span></div>
           </div>
           <PhoneMap progress={routeProgress} streetX={STREET.minX + routeProgress * (STREET.maxX - STREET.minX)} />
@@ -1052,7 +1147,7 @@ export const App: React.FC = () => {
             <div className="mt-5 grid gap-2">
               {subjectOrder.map((s) => (
                 <div key={s} className="flex justify-between border border-neutral-800 px-4 py-3 text-sm">
-                  <span>{SUBJECT_LABELS[s]}</span>
+                  <span>{SUBJECT_LABELS[s] ?? (s === 'art' ? 'Artes' : s)}</span>
                   <span className="text-emerald-300">{grades[s] ?? '—'}</span>
                 </div>
               ))}
@@ -1094,7 +1189,7 @@ export const App: React.FC = () => {
       )}
 
       {activeScreen === 'gameplay' && worldArea === 'dream' && (
-        <DreamBabylonScene onComplete={() => {
+        <DreamBabylonScene key={devDreamRun} initialPhase={devDreamPhase} onComplete={() => {
           setWorldArea('house');
           setIsSecondNightCutscene(false);
           setCaseCompletedOpen(true);
@@ -1177,7 +1272,7 @@ export const App: React.FC = () => {
         <InventoryModal items={gameState.inventory} onClose={() => setIsInventoryOpen(false)} onInspectItem3D={handleInspectModelType} onCombineItems={() => showToast('Tentativa de combinar os itens catalogados.')} />
       )}
 
-      {worldArea !== 'school' && activeMinigame && (
+      {activeMinigame && (
         <ChapterMinigames
           activity={activeMinigame}
           onClose={() => setActiveMinigame(null)}
