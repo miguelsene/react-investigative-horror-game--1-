@@ -66,12 +66,12 @@ export const PhoneMap: React.FC<Props> = ({ progress, streetX, direction = 'toSc
   }, [route, streetX]);
 
   return (
-    <aside className="absolute bottom-5 left-5 z-20 w-52 overflow-hidden rounded-[20px] border border-white/20 bg-[#0a0d13]/92 shadow-2xl backdrop-blur-md pointer-events-none">
+    <aside className="absolute bottom-5 left-5 z-20 w-52 overflow-hidden rounded-[20px] border border-white/20 bg-[#0a0d13]/92 shadow-2xl backdrop-blur-md pointer-events-none max-[767px]:bottom-auto max-[767px]:left-auto max-[767px]:right-3 max-[767px]:top-16 max-[767px]:w-36 max-[767px]:rounded-xl">
       <div className="flex items-center justify-between border-b border-white/10 px-3 py-1.5 font-mono text-[9px] tracking-wider text-neutral-400">
         <span>MAPS · 07:2{Math.min(9, Math.round(clamped * 9))}</span>
         <span className="text-neutral-300">{minutes} min</span>
       </div>
-      <div className="relative" style={{ height: H }}>
+      <div className="relative max-[767px]:!h-[92px]" style={{ height: H }}>
         <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full" aria-hidden="true">
           <rect width={W} height={H} fill="#0f1319" />
           {/* city blocks */}

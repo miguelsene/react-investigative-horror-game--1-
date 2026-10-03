@@ -4,12 +4,14 @@ import { soundManager } from '../audio/soundManager';
 import { buildStreet } from '../three/street';
 import { createGabrielaSprite, preloadGabrielaSprite } from '../three/gabrielaSprite';
 import { ExplorationCamera } from '../three/cameraRig';
+import { applyAreaCameraCinematic } from '../three/areaCameraCinematic';
 import { softCircle } from '../three/textures';
 import { STREET, STREET_MONOLOGUES, RETURN_MONOLOGUES, SCHOOL_X, progressAt, walkZ } from '../data/streetRoute';
 
 interface Props {
   paused: boolean;
   cameraMotionEnabled: boolean;
+  cameraCinematic?: boolean;
   direction?: 'toSchool' | 'home';
   onProgress: (progress: number) => void;
   onMonologue: (text: string) => void;
@@ -21,10 +23,12 @@ interface Props {
 const blocked = (x: number, z: number, colliders: { x: number; z: number; w: number; d: number }[]) =>
   colliders.some((c) => Math.abs(x - c.x) < c.w / 2 + 0.26 && Math.abs(z - c.z) < c.d / 2 + 0.26);
 
-export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, direction = 'toSchool', onProgress, onMonologue, monologues, onArriveSchool, onArriveHome }) => {
+export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, cameraCinematic, direction = 'toSchool', onProgress, onMonologue, monologues, onArriveSchool, onArriveHome }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLButtonElement>(null);
+  const touchInteractRef = useRef<HTMLButtonElement>(null);
   const enterSchoolRef = useRef<() => void>(() => {});
+  const touchKeysRef = useRef<Record<string, boolean>>({});
   const zoomRef = useRef(0);
   const [zoomLevel, setZoomLevel] = React.useState(0);
   const setZoom = (value: number) => {
@@ -32,9 +36,9 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
     zoomRef.current = next;
     setZoomLevel(next);
   };
-  const live = useRef({ paused, cameraMotionEnabled, direction, onProgress, onMonologue, monologues, onArriveSchool, onArriveHome });
+  const live = useRef({ paused, cameraMotionEnabled, cameraCinematic, direction, onProgress, onMonologue, monologues, onArriveSchool, onArriveHome });
   useEffect(() => {
-    live.current = { paused, cameraMotionEnabled, direction, onProgress, onMonologue, monologues, onArriveSchool, onArriveHome };
+    live.current = { paused, cameraMotionEnabled, cameraCinematic, direction, onProgress, onMonologue, monologues, onArriveSchool, onArriveHome };
   });
 
   useEffect(() => {
@@ -125,6 +129,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
       Object.keys(keys).forEach((k) => {
         keys[k] = false;
       });
+      Object.keys(touchKeysRef.current).forEach((k) => { touchKeysRef.current[k] = false; });
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -137,6 +142,8 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
 
     const clock = new THREE.Timer();
     clock.connect(document);
+    let cameraSequenceStartedAt = 0;
+    const cameraSequenceStart = new THREE.Vector3();
     let raf = 0;
     const loop = () => {
       raf = requestAnimationFrame(loop);
@@ -153,10 +160,10 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
       const locked = live.current.paused;
       if (!locked) {
         const speed = 3.5 * dt;
-        if (keys.w || keys.arrowup) dz -= speed;
-        if (keys.s || keys.arrowdown) dz += speed;
-        if (keys.a || keys.arrowleft) dx -= speed;
-        if (keys.d || keys.arrowright) dx += speed;
+        if (keys.w || keys.arrowup || touchKeysRef.current.w) dz -= speed;
+        if (keys.s || keys.arrowdown || touchKeysRef.current.s) dz += speed;
+        if (keys.a || keys.arrowleft || touchKeysRef.current.a) dx -= speed;
+        if (keys.d || keys.arrowright || touchKeysRef.current.d) dx += speed;
       }
       if (dx !== 0 && dz !== 0) {
         dx *= 0.7071;
@@ -193,6 +200,10 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
       shadow.position.set(pos.x, 0.118, pos.z);
 
       rig.update(pos, vx, vz, dt, t, zoomRef.current, live.current.cameraMotionEnabled, locked);
+      if (live.current.cameraCinematic) {
+        if (!cameraSequenceStartedAt) { cameraSequenceStartedAt = performance.now(); cameraSequenceStart.copy(camera.position); }
+        applyAreaCameraCinematic(camera, pos, cameraSequenceStart, Math.min(1, (performance.now() - cameraSequenceStartedAt) / 2800), 'street');
+      } else cameraSequenceStartedAt = 0;
 
       // Monologues are keyed to real street coordinates; the walk home reads
       // them in reverse so the reflections still follow the journey.
@@ -214,6 +225,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
 
       nearGate = live.current.direction === 'home' ? pos.x < STREET.minX + 3.2 : pos.x > SCHOOL_X - 3.2;
       if (promptRef.current) promptRef.current.hidden = !nearGate || locked;
+      if (touchInteractRef.current) touchInteractRef.current.hidden = !nearGate || locked;
 
       const progress = live.current.direction === 'home' ? 1 - progressAt(pos.x) : progressAt(pos.x);
       if (Math.abs(progress - lastProgress) > 0.004) {
@@ -253,6 +265,13 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
     };
   }, []);
 
+  const pressTouchKey = (event: React.PointerEvent<HTMLButtonElement>, key: string) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    touchKeysRef.current[key] = true;
+  };
+  const releaseTouchKey = (key: string) => { touchKeysRef.current[key] = false; };
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div ref={mountRef} className="h-full w-full" />
@@ -260,6 +279,15 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
         <button type="button" onClick={() => setZoom(zoomLevel + 1)} disabled={zoomLevel >= 2} aria-label="Aproximar câmera" className="grid h-10 w-10 place-items-center border border-white/30 bg-black/65 text-xl text-white backdrop-blur-sm transition hover:bg-black/85 disabled:opacity-35">+</button>
         <button type="button" onClick={() => setZoom(zoomLevel - 1)} disabled={zoomLevel <= 0} aria-label="Afastar câmera" className="grid h-10 w-10 place-items-center border border-white/30 bg-black/65 text-xl text-white backdrop-blur-sm transition hover:bg-black/85 disabled:opacity-35">−</button>
       </div>
+      <div className="touch-only absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-30 flex-col items-center gap-1 select-none" aria-label="Controles de movimento">
+        <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => pressTouchKey(event, 'w')} onPointerUp={() => releaseTouchKey('w')} onPointerCancel={() => releaseTouchKey('w')} onLostPointerCapture={() => releaseTouchKey('w')} aria-label="Andar para frente">▲</button>
+        <div className="flex gap-1">
+          <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => pressTouchKey(event, 'a')} onPointerUp={() => releaseTouchKey('a')} onPointerCancel={() => releaseTouchKey('a')} onLostPointerCapture={() => releaseTouchKey('a')} aria-label="Andar para esquerda">◀</button>
+          <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => pressTouchKey(event, 's')} onPointerUp={() => releaseTouchKey('s')} onPointerCancel={() => releaseTouchKey('s')} onLostPointerCapture={() => releaseTouchKey('s')} aria-label="Andar para trás">▼</button>
+          <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => pressTouchKey(event, 'd')} onPointerUp={() => releaseTouchKey('d')} onPointerCancel={() => releaseTouchKey('d')} onLostPointerCapture={() => releaseTouchKey('d')} aria-label="Andar para direita">▶</button>
+        </div>
+      </div>
+      <button ref={touchInteractRef} hidden onClick={() => enterSchoolRef.current()} className="touch-only absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 min-h-12 items-center justify-center rounded-full border border-red-100/45 bg-black/75 px-5 font-serif-jp text-[10px] tracking-[0.16em] text-white shadow-xl backdrop-blur-md">INTERAGIR</button>
       <button ref={promptRef} hidden onClick={() => enterSchoolRef.current()} className="absolute left-1/2 top-[38%] -translate-x-1/2 proximity-prompt pointer-events-auto">
         <span className="proximity-dot" />
         <span className="proximity-caption">

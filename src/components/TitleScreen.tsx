@@ -9,7 +9,6 @@ interface TitleScreenProps {
   onNewGame: (slot: number) => void;
   onOpenChapters: () => void;
   onOpenSettings: () => void;
-  onExtra: () => void;
   onDeveloper: () => void;
   onAudioStart: () => void;
 }
@@ -22,7 +21,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onNewGame,
   onOpenChapters,
   onOpenSettings,
-  onExtra,
   onDeveloper,
   onAudioStart,
 }) => {
@@ -129,8 +127,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
     { id: 'new', label: 'NOVO JOGO', sub: 'Capítulo 1 — A Casa', disabled: false },
     { id: 'chapters', label: 'CAPÍTULOS', sub: 'Arquivo de casos', disabled: false },
     { id: 'options', label: 'OPÇÕES', sub: 'Áudio, vídeo e dados', disabled: false },
-    { id: 'extra', label: 'EXTRA', sub: 'Simulação de encontro noturno', disabled: false },
-    { id: 'developer', label: 'ENTRAR COMO DEV', sub: 'Pular diálogos e missões domésticas', disabled: false },
+    { id: 'developer', label: 'MODO DESENVOLVEDOR', sub: 'Acesso rápido para desenvolvimento', disabled: false },
   ];
 
   const run = useCallback(
@@ -143,11 +140,10 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
       } else if (it.id === 'continue') setSlotPicker('continue');
       else if (it.id === 'chapters') onOpenChapters();
       else if (it.id === 'options') onOpenSettings();
-      else if (it.id === 'extra') onExtra();
       else onDeveloper();
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasSavedGame, confirmNew, onNewGame, onContinue, onOpenChapters, onOpenSettings, onExtra, onDeveloper]
+    [hasSavedGame, confirmNew, onNewGame, onContinue, onOpenChapters, onOpenSettings, onDeveloper]
   );
 
   useEffect(() => {
@@ -207,58 +203,57 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
       )}
 
       {/* Title */}
-      <div className="title-screen-heading absolute left-[7%] right-auto top-[9%] sm:top-[7%] flex w-[min(36rem,82vw)] flex-col items-start text-left z-20 pointer-events-none px-0">
-        <span className="font-serif-jp text-[11px] tracking-[0.55em] text-neutral-400 uppercase fade-up">京都 · 未解決</span>
-        <h1 className="title-in title-glow title-screen-name font-title font-black text-[clamp(2.5rem,8vw,5.7rem)] leading-[0.95] text-[#e8e4dc] mt-3 tracking-[0.04em]">
-          Quem é você?
+      <div className="absolute left-[7%] right-[7%] top-[9%] z-10 flex flex-col items-start text-left pointer-events-none sm:top-1/2 sm:right-auto sm:w-[min(54vw,46rem)] sm:-translate-y-1/2">
+        <span className="font-serif-jp text-[10px] sm:text-[11px] tracking-[0.38em] sm:tracking-[0.55em] text-neutral-300/75 uppercase fade-up">KYOTO · ARQUIVO 74-0317</span>
+        <h1 className="title-in title-glow title-screen-name mt-4 font-title font-black text-[clamp(2.8rem,13vw,7.5rem)] leading-[0.9] text-[#eee8dc] tracking-[0.02em] sm:mt-6">
+          QUEM É<br className="sm:hidden" /> VOCÊ?
         </h1>
-        <div className="mt-5 h-px w-44 bg-gradient-to-r from-transparent via-red-700/90 to-transparent" />
-        {/* Ordem Paranormal brand mark */}
-        <div className="title-brand mt-5 hidden" style={{ animationDelay: '0.8s' }}>
-            <img
-              src="/images/op_logo.png"
-              alt="Op Logo"
-              className="opacity-90 drop-shadow-[0_0_18px_rgba(198,40,40,0.25)]"
-              style={{ width: '500px', height: '450px' }}
-              draggable={false}
-            />
+        <div className="mt-5 h-px w-36 sm:w-52 bg-gradient-to-r from-red-500/90 via-red-300/30 to-transparent" />
+        <p className="mt-4 max-w-sm font-serif-jp text-xs sm:text-sm leading-6 tracking-[0.12em] text-neutral-200/75 fade-up sm:mt-6">
+          Algumas lembranças não pertencem a quem as recorda.
+        </p>
+        <div className="mt-5 flex items-center gap-3 font-mono text-[9px] tracking-[0.28em] text-neutral-300/55 sm:mt-8">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_12px_rgba(239,68,68,.9)]" />
+          <span>KYOTO · 03:17 · CASO NÃO RESOLVIDO</span>
         </div>
-        <span className="font-serif-jp text-xs tracking-[0.35em] text-neutral-500 mt-4 uppercase fade-up" style={{ animationDelay: '1.2s' }}>
-          Terror investigativo · Kyoto
-        </span>
+        {phase === 'attract' && (
+          <div className="pointer-events-auto mt-8 sm:mt-10">
+            {!ready ? (
+              <div className="flex w-64 flex-col gap-3">
+                <span className="font-serif-jp text-[10px] tracking-[0.3em] text-neutral-300/75 uppercase">Carregando os arquivos</span>
+                <div className="relative h-px overflow-hidden bg-white/15"><div className="absolute inset-y-0 left-0 bg-red-300 transition-all duration-300" style={{ width: `${Math.round(loadProgress * 100)}%` }} /></div>
+              </div>
+            ) : (
+              <button onClick={(event) => { event.stopPropagation(); start(); }} className="group flex min-h-12 items-center gap-4 border border-white/35 bg-black/35 px-5 py-3 font-serif-jp text-[10px] tracking-[0.28em] text-white backdrop-blur-sm transition hover:border-red-200/80 hover:bg-red-950/45 sm:px-7">
+                <span className="text-red-300 transition-transform group-hover:translate-x-1">▶</span> ABRIR O ARQUIVO <span className="text-neutral-500">↵</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Attract / Loading */}
-      {phase === 'attract' && (
-        <div className="absolute left-[7%] right-auto bottom-[12%] flex flex-col items-start z-20 pointer-events-none">
-          {!ready ? (
-            <div className="flex flex-col items-center gap-3">
-              <span className="font-serif-jp text-xs tracking-[0.4em] text-neutral-500 uppercase">Carregando arquivos do caso</span>
-              <div className="w-56 h-px bg-neutral-800 relative overflow-hidden">
-                <div className="absolute left-0 top-0 h-full bg-neutral-300 transition-all duration-300" style={{ width: `${Math.round(loadProgress * 100)}%` }} />
-              </div>
-            </div>
-          ) : (
-            <span className="blink-slow font-serif-jp text-sm tracking-[0.45em] text-neutral-300 uppercase">Pressione qualquer tecla</span>
-          )}
-        </div>
-      )}
-
-      {slotPicker && <div className="fixed inset-0 z-[60] grid place-items-center bg-black/80 p-5 backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
-        <section className="w-full max-w-3xl border border-white/20 bg-[#0a0b10]/95 p-6 sm:p-9 text-[#eee8dc] shadow-2xl">
+      {slotPicker && <div className="fixed inset-0 z-[60] grid place-items-center bg-black/80 p-3 sm:p-5 backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
+        <section className="max-h-[94dvh] w-full max-w-3xl overflow-y-auto border border-white/20 bg-[#0a0b10]/95 p-4 sm:p-9 text-[#eee8dc] shadow-2xl">
           <div className="mb-6 flex items-center justify-between"><div><p className="font-serif-jp text-[10px] tracking-[.4em] text-rose-200/70">ARQUIVO PESSOAL</p><h2 className="mt-2 font-title text-2xl tracking-[.15em]">{slotPicker === 'new' ? 'ESCOLHA UM ESPAÇO' : 'RETOMAR INVESTIGAÇÃO'}</h2></div><button onClick={() => setSlotPicker(null)} className="text-neutral-400 hover:text-white">FECHAR ×</button></div>
           <div className="grid gap-3 sm:grid-cols-2">{[1,2,3,4].map(slot => { const exists = !!localStorage.getItem(`gabriela_game_save_${slot}`) || (slot === 1 && !!localStorage.getItem('gabriela_game_save')); return <button key={slot} disabled={slotPicker === 'continue' && !exists} onClick={() => { const mode = slotPicker; setSlotPicker(null); if (mode === 'new') onNewGame(slot); else onContinue(slot); }} className="min-h-28 border border-white/15 bg-white/[.035] p-4 text-left transition hover:border-rose-200/60 hover:bg-rose-950/20 disabled:opacity-30"><span className="font-title text-lg tracking-[.18em]">SLOT 0{slot}</span><span className="mt-2 block font-serif-jp text-xs text-neutral-400">{exists ? 'Caso salvo · continuar de onde parou' : 'Novo arquivo · vazio'}</span></button>})}</div>
         </section>
       </div>}
       {/* Menu */}
       {phase === 'menu' && (
-        <div className="absolute left-[7%] right-auto top-[43%] sm:top-[38%] bottom-auto flex max-h-[48vh] flex-col items-start overflow-y-auto z-20 fade-up">
+        <section className="absolute inset-x-4 bottom-[4svh] z-20 max-h-[54svh] overflow-y-auto border-t border-white/20 bg-black/45 px-3 py-3 shadow-[0_18px_60px_rgba(0,0,0,.4)] backdrop-blur-xl fade-up sm:inset-y-auto sm:bottom-auto sm:left-auto sm:right-[7%] sm:top-1/2 sm:w-[min(26rem,34vw)] sm:max-h-[78vh] sm:-translate-y-1/2 sm:border-t-0 sm:border-l sm:border-white/20 sm:bg-black/35 sm:px-6 sm:py-5">
+          <div className="mb-3 flex items-end justify-between border-b border-white/15 pb-3 sm:mb-5 sm:pb-4">
+            <div>
+              <span className="font-mono text-[8px] tracking-[0.32em] text-red-300/80">MENU PRINCIPAL</span>
+              <h2 className="mt-1 font-title text-base tracking-[0.18em] text-neutral-100 sm:text-lg">INVESTIGAÇÃO</h2>
+            </div>
+            <span className="font-mono text-[9px] tracking-widest text-neutral-500">03:17</span>
+          </div>
           {confirmNew ? (
-            <div className="flex flex-col items-center gap-4 text-center">
-              <span className="font-serif-jp text-sm tracking-[0.25em] text-neutral-200">Apagar o progresso atual e recomeçar?</span>
-              <div className="flex gap-8 font-title text-sm tracking-[0.3em]">
+            <div className="flex flex-col items-start gap-4 py-2 text-left sm:items-center sm:text-center">
+              <span className="font-serif-jp text-sm leading-6 text-neutral-200">Apagar o progresso atual e recomeçar?</span>
+              <div className="flex w-full gap-3 font-title text-xs tracking-[0.2em] sm:justify-center sm:text-sm sm:tracking-[0.3em]">
                 <button
-                  className="text-red-300 hover:text-red-200"
+                  className="min-h-11 flex-1 border border-red-300/50 px-3 text-red-200 hover:bg-red-950/40 sm:flex-none"
                   onClick={(e) => {
                     e.stopPropagation();
                     setConfirmNew(false);
@@ -266,25 +261,25 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                     setSlotPicker('new');
                   }}
                 >
-                  SIM <span className="text-neutral-600 text-[10px]">[ENTER]</span>
+                  SIM <span className="text-neutral-500 text-[9px]">[ENTER]</span>
                 </button>
                 <button
-                  className="text-neutral-300 hover:text-white"
+                  className="min-h-11 flex-1 border border-white/15 px-3 text-neutral-300 hover:bg-white/5 sm:flex-none"
                   onClick={(e) => {
                     e.stopPropagation();
                     setConfirmNew(false);
                   }}
                 >
-                  NÃO <span className="text-neutral-600 text-[10px]">[ESC]</span>
+                  NÃO <span className="text-neutral-500 text-[9px]">[ESC]</span>
                 </button>
               </div>
             </div>
           ) : (
-            <ul className="flex flex-col items-start gap-1 sm:gap-2.5">
+            <ul className="flex flex-col gap-1 sm:gap-2">
               {items.map((it, idx) => {
                 const active = idx === selected;
                 return (
-                  <li key={it.id} className="relative">
+                  <li key={it.id} className="w-full">
                     <button
                       disabled={it.disabled}
                       onMouseEnter={() => {
@@ -297,29 +292,27 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                         e.stopPropagation();
                         run(idx);
                       }}
-                      className={`font-title text-xs sm:text-base tracking-[0.2em] sm:tracking-[0.28em] uppercase transition-all duration-200 pl-6 pr-3 py-1 ${
-                        it.disabled ? 'text-neutral-700 cursor-not-allowed' : active ? 'text-red-200 title-glow scale-105' : 'text-neutral-400 hover:text-neutral-200'
+                      className={`group flex min-h-11 w-full items-center gap-3 border-b px-2 py-2 text-left transition-all duration-200 sm:min-h-[3.25rem] sm:px-3 ${
+                        it.disabled ? 'border-white/5 text-neutral-600 cursor-not-allowed' : active ? 'border-rose-200/55 bg-white/[.07] text-white' : 'border-white/10 text-neutral-300 hover:border-white/25 hover:bg-white/[.04]'
                       }`}
                     >
-                      <span className={`absolute -left-1 transition-opacity ${active && !it.disabled ? 'opacity-100 text-red-500' : 'opacity-0'}`}>▸</span>
-                      {it.label}
+                      <span className={`w-3 shrink-0 text-xs transition-colors ${active && !it.disabled ? 'text-red-300' : 'text-neutral-600'}`}>▸</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-title text-[10px] tracking-[0.16em] sm:text-xs sm:tracking-[0.22em]">{it.label}</span>
+                        <span className="mt-0.5 block truncate font-serif-jp text-[9px] tracking-[0.04em] text-neutral-500 sm:text-[10px]">{it.sub}</span>
+                      </span>
+                      {it.id === 'continue' && <span className="font-mono text-[8px] tracking-widest text-neutral-500">{hasSavedGame ? 'SALVO' : 'VAZIO'}</span>}
                     </button>
-                    {active && !it.disabled && (
-                      <div className="hidden sm:block absolute left-full top-1/2 ml-5 -translate-y-1/2 font-serif-jp text-[9px] tracking-[0.2em] text-neutral-400/70 uppercase whitespace-nowrap">{it.sub}</div>
-                    )}
                   </li>
                 );
               })}
             </ul>
           )}
-        </div>
+        </section>
       )}
 
-      <div className="absolute bottom-[8%] left-[5.4%] flex flex-col gap-2 font-serif-jp text-[10px] tracking-[0.3em] text-neutral-300/55 uppercase z-20 pointer-events-none">
-        <span>Caso 74-0317 · Arquivos de Kyoto</span>
-        <span className="text-base tracking-[0.4em]">03:17</span>
-        <span className="text-[8px] tracking-[0.2em]">— Algumas coisas</span>
-        <span className="pl-8 text-[8px] tracking-[0.2em]">não deveriam ser lembradas.</span>
+      <div className="absolute bottom-[4%] left-[7%] z-10 hidden items-center gap-3 font-mono text-[8px] tracking-[0.28em] text-neutral-400/55 sm:flex pointer-events-none">
+        <span>GABRIELA · CAPÍTULO 01</span><span className="h-px w-8 bg-red-400/50" /><span>ALGUMAS COISAS NÃO DEVERIAM SER LEMBRADAS</span>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { buildSchool, SchoolDoor, SchoolNpc } from '../three/schoolMap';
 import { createGabrielaSprite, preloadGabrielaSprite } from '../three/gabrielaSprite';
 import { softCircle } from '../three/textures';
 import { ExplorationCamera } from '../three/cameraRig';
+import { applyAreaCameraCinematic } from '../three/areaCameraCinematic';
 import { DialogueBox } from './DialogueBox';
 
 import { SchoolSpot } from '../three/schoolMap';
@@ -12,6 +13,7 @@ import { SchoolSpot } from '../three/schoolMap';
 interface Props {
   paused: boolean;
   cameraMotionEnabled: boolean;
+  cameraCinematic?: boolean;
   onSitAtDesk: () => void;
   onTriggerDialogue: (dialogueId: string, label?: string) => void;
 }
@@ -19,11 +21,13 @@ interface Props {
 const hit = (x: number, z: number, colliders: { x: number; z: number; w: number; d: number; enabled?: boolean }[]) =>
   colliders.some((c) => c.enabled !== false && Math.abs(x - c.x) < c.w / 2 + 0.24 && Math.abs(z - c.z) < c.d / 2 + 0.24);
 
-export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSitAtDesk, onTriggerDialogue }) => {
+export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, cameraCinematic, onSitAtDesk, onTriggerDialogue }) => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const live = useRef({ paused, cameraMotionEnabled, onSitAtDesk, onTriggerDialogue });
+  const touchKeysRef = useRef<Record<string, boolean>>({});
+  const interactRef = useRef<() => void>(() => {});
+  const live = useRef({ paused, cameraMotionEnabled, cameraCinematic, onSitAtDesk, onTriggerDialogue });
   useEffect(() => {
-    live.current = { paused, cameraMotionEnabled, onSitAtDesk, onTriggerDialogue };
+    live.current = { paused, cameraMotionEnabled, cameraCinematic, onSitAtDesk, onTriggerDialogue };
   });
 
   const [talkingTo, setTalkingTo] = useState<SchoolNpc | null>(null);
@@ -152,6 +156,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
         }
       }
     };
+    interactRef.current = talk;
 
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -184,7 +189,10 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     const onKeyUp = (e: KeyboardEvent) => {
       keys[e.key.toLowerCase()] = false;
     };
-    const onBlur = () => Object.keys(keys).forEach((k) => (keys[k] = false));
+    const onBlur = () => {
+      Object.keys(keys).forEach((k) => (keys[k] = false));
+      Object.keys(touchKeysRef.current).forEach((k) => { touchKeysRef.current[k] = false; });
+    };
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey || e.metaKey) return;
       e.preventDefault();
@@ -207,6 +215,8 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
     let lastFrame = 0;
     // Throttle occlusion updates — every 3rd frame is enough (saves ~60 damp calls/frame)
     let occlusionFrame = 0;
+    let cameraSequenceStartedAt = 0;
+    const cameraSequenceStart = new THREE.Vector3();
     const loop = (now = performance.now()) => {
       raf = requestAnimationFrame(loop);
       if (document.hidden || now - lastFrame < 1000 / 60) return;
@@ -223,10 +233,10 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       let dz = 0;
       if (!live.current.paused) {
         const speed = 3.4 * dt;
-        if (keys.w || keys.arrowup) dz -= speed;
-        if (keys.s || keys.arrowdown) dz += speed;
-        if (keys.a || keys.arrowleft) dx -= speed;
-        if (keys.d || keys.arrowright) dx += speed;
+        if (keys.w || keys.arrowup || touchKeysRef.current.w) dz -= speed;
+        if (keys.s || keys.arrowdown || touchKeysRef.current.s) dz += speed;
+        if (keys.a || keys.arrowleft || touchKeysRef.current.a) dx -= speed;
+        if (keys.d || keys.arrowright || touchKeysRef.current.d) dx += speed;
       }
       if (dx && dz) {
         dx *= 0.7071;
@@ -264,45 +274,34 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
       shadow.position.set(pos.x, 0.035, pos.z);
 
       rig.update(pos, vx, vz, dt, t, zoomLevelRef.current, live.current.cameraMotionEnabled, live.current.paused);
+      if (live.current.cameraCinematic) {
+        if (!cameraSequenceStartedAt) { cameraSequenceStartedAt = performance.now(); cameraSequenceStart.copy(camera.position); }
+        applyAreaCameraCinematic(camera, pos, cameraSequenceStart, Math.min(1, (performance.now() - cameraSequenceStartedAt) / 2800), 'school');
+      } else cameraSequenceStartedAt = 0;
       // Run occlusion every 3 frames — imperceptible latency, saves ~60 material.opacity damps/frame
       occlusionFrame++;
-      if (occlusionFrame % 6 === 0) school.updateCameraOcclusion(camera, pos, dt * 6);
+      if (live.current.cameraCinematic || occlusionFrame % 6 === 0) school.updateCameraOcclusion(camera, pos, live.current.cameraCinematic ? dt : dt * 6);
 
       // Interaction prompts only need refreshing several times per second.
       if (occlusionFrame % 6 === 0) {
       // Nearest interactable NPC
-      let bestDoor: SchoolDoor | null = null;
-      let bestDoorDist = 1.35;
-      school.doors.forEach((door) => {
+      const bestDoor = school.doors.reduce<SchoolDoor | null>((best, door) => {
         const d = Math.hypot(door.x - pos.x, door.z - pos.z);
-        if (d < bestDoorDist) {
-          bestDoorDist = d;
-          bestDoor = door;
-        }
-      });
+        return d < 1.35 && (!best || d < Math.hypot(best.x - pos.x, best.z - pos.z)) ? door : best;
+      }, null);
       nearestDoor = bestDoor;
 
-      let bestNpc: SchoolNpc | null = null;
-      let bestNpcDist = 1.9;
-      school.npcs.forEach((npc) => {
+      const bestNpc = school.npcs.reduce<SchoolNpc | null>((best, npc) => {
         const d = Math.hypot(npc.x - pos.x, npc.z - pos.z);
-        if (d < bestNpcDist) {
-          bestNpcDist = d;
-          bestNpc = npc;
-        }
-      });
+        return d < 1.9 && (!best || d < Math.hypot(best.x - pos.x, best.z - pos.z)) ? npc : best;
+      }, null);
       nearestNpc = bestNpc;
 
       // Nearest interactable spot
-      let bestSpot: SchoolSpot | null = null;
-      let bestSpotDist = 1.9;
-      school.spots.forEach((sp) => {
-        const d = Math.hypot(sp.x - pos.x, sp.z - pos.z);
-        if (d < bestSpotDist) {
-          bestSpotDist = d;
-          bestSpot = sp;
-        }
-      });
+      const bestSpot = school.spots.reduce<SchoolSpot | null>((best, spot) => {
+        const d = Math.hypot(spot.x - pos.x, spot.z - pos.z);
+        return d < 1.9 && (!best || d < Math.hypot(best.x - pos.x, best.z - pos.z)) ? spot : best;
+      }, null);
       nearestSpot = bestSpot;
 
       const dDesk = Math.hypot(pos.x - school.deskAt[0], pos.z - school.deskAt[1]);
@@ -421,7 +420,17 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
         />
       )}
 
-      <div className="absolute bottom-5 right-28 z-20 flex items-center gap-1.5 bg-black/60 border border-neutral-800/80 px-2.5 py-1 rounded-full backdrop-blur-md">
+      <div className="touch-only absolute bottom-4 left-4 z-30 flex-col items-center gap-1 select-none" aria-label="Controles de movimento">
+        <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touchKeysRef.current.w = true; }} onPointerUp={() => { touchKeysRef.current.w = false; }} onPointerCancel={() => { touchKeysRef.current.w = false; }} onLostPointerCapture={() => { touchKeysRef.current.w = false; }} aria-label="Andar para frente">▲</button>
+        <div className="flex gap-1">
+          <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touchKeysRef.current.a = true; }} onPointerUp={() => { touchKeysRef.current.a = false; }} onPointerCancel={() => { touchKeysRef.current.a = false; }} onLostPointerCapture={() => { touchKeysRef.current.a = false; }} aria-label="Andar para esquerda">◀</button>
+          <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touchKeysRef.current.s = true; }} onPointerUp={() => { touchKeysRef.current.s = false; }} onPointerCancel={() => { touchKeysRef.current.s = false; }} onLostPointerCapture={() => { touchKeysRef.current.s = false; }} aria-label="Andar para trás">▼</button>
+          <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touchKeysRef.current.d = true; }} onPointerUp={() => { touchKeysRef.current.d = false; }} onPointerCancel={() => { touchKeysRef.current.d = false; }} onLostPointerCapture={() => { touchKeysRef.current.d = false; }} aria-label="Andar para direita">▶</button>
+        </div>
+      </div>
+      <button hidden={!hud || !!talkingTo} onClick={() => interactRef.current()} className="touch-only absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 min-h-12 items-center justify-center rounded-full border border-white/25 bg-black/75 px-5 font-serif-jp text-[10px] tracking-[0.16em] text-white shadow-xl backdrop-blur-md">INTERAGIR</button>
+
+      <div className="absolute bottom-20 right-4 z-20 flex items-center gap-1.5 bg-black/60 border border-neutral-800/80 px-2.5 py-1 rounded-full backdrop-blur-md sm:bottom-5 sm:right-28">
         <button
           onClick={() => {
             const next = Math.max(0, zoomLevel - 1);
@@ -450,7 +459,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, onSi
           +
         </button>
       </div>
-      <div className="absolute bottom-5 left-5 z-20 rounded-full border border-neutral-800/80 bg-black/55 px-3 py-2 font-serif-jp text-[9px] tracking-[0.16em] text-neutral-400 backdrop-blur-md"><kbd className="mr-2 text-neutral-200">TAB</kbd>INVERTER CÂMERA</div>
+      <div className="absolute bottom-5 left-5 z-20 hidden rounded-full border border-neutral-800/80 bg-black/55 px-3 py-2 font-serif-jp text-[9px] tracking-[0.16em] text-neutral-400 backdrop-blur-md sm:block"><kbd className="mr-2 text-neutral-200">TAB</kbd>INVERTER CÂMERA</div>
     </div>
   );
 };

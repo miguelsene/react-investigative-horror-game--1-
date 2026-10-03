@@ -38,7 +38,7 @@ export const JournalModal: React.FC<JournalModalProps> = ({ clues, notes, curren
   const [tab, setTab] = useState<Tab>('evidencias');
   return (
     <Panel title="DIÁRIO" jp="捜査手帳" subtitle={`Caso 74-0317 · ${currentTime}`} onClose={onClose} hotkey="J" width="max-w-4xl" footer={<><span>Caderno de campo de Gabriela</span><span>{clues.length} evidências · {notes.length} notas</span></>}>
-      <nav className="flex gap-6 mb-6 font-serif-jp text-[12px] tracking-[0.3em] uppercase">
+      <nav aria-label="Seções do diário" className="mb-4 grid grid-cols-3 gap-1 sm:mb-6 sm:flex sm:flex-wrap sm:gap-5 font-serif-jp text-[10px] sm:text-[12px] tracking-[0.12em] sm:tracking-[0.3em] uppercase">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -46,7 +46,8 @@ export const JournalModal: React.FC<JournalModalProps> = ({ clues, notes, curren
               soundManager.playMenuMove();
               setTab(t.id);
             }}
-            className={`pb-1 border-b transition-colors ${tab === t.id ? 'border-red-500 text-neutral-100' : 'border-transparent text-neutral-500 hover:text-neutral-300'}`}
+            aria-pressed={tab === t.id}
+            className={`min-h-10 rounded-sm border-b px-1 text-center transition-colors sm:min-h-0 sm:px-0 sm:text-left ${tab === t.id ? 'border-red-500 text-neutral-100 bg-white/[.04] sm:bg-transparent' : 'border-white/10 text-neutral-400 hover:text-neutral-200 sm:border-transparent'}`}
           >
             {t.label}
           </button>

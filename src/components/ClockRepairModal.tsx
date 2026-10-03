@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
 import { Panel } from './ui/Panel';
 import { Minus, Plus, Check } from 'lucide-react';
 import { soundManager } from '../audio/soundManager';
-import { makeEnamelClockDial } from '../three/advancedTextures';
 
 interface Props {
   clockId: string;
@@ -22,8 +20,7 @@ const parseTime = (text: string) => {
 };
 
 export const ClockRepairModal: React.FC<Props> = ({ clockId, name, room, wrong, target, alreadyFixed, onClose, onFixed }) => {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const faceMaterial = useRef<THREE.MeshBasicMaterial | null>(null);
+  const mountRef = useRef<HTMLCanvasElement>(null);
   const [hours, setHours] = useState(parseTime(alreadyFixed ? target : wrong).h);
   const [minutes, setMinutes] = useState(parseTime(alreadyFixed ? target : wrong).m);
   const [fixed, setFixed] = useState(alreadyFixed);
@@ -36,95 +33,44 @@ export const ClockRepairModal: React.FC<Props> = ({ clockId, name, room, wrong, 
   };
 
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount) return;
-    let renderer: THREE.WebGLRenderer;
-    try {
-      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    } catch {
-      return;
-    }
-    const w = Math.max(1, mount.clientWidth);
-    const h = Math.max(1, mount.clientHeight);
-    renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
-    renderer.setClearColor(0, 0);
-    mount.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 20);
-    camera.position.set(0, 0, 3);
-    scene.add(new THREE.AmbientLight(0xffffff, 1.15));
-    const key = new THREE.DirectionalLight(0xfff0dc, 1.5);
-    key.position.set(2, 3, 3);
-    scene.add(key);
-
-    const group = new THREE.Group();
-    scene.add(group);
-    const caseMesh = new THREE.Mesh(
-      new THREE.CircleGeometry(0.82, 48),
-      new THREE.MeshStandardMaterial({ color: 0x2b1c14, roughness: 0.55, metalness: 0.1 }),
-    );
-    caseMesh.position.z = -0.02;
-    group.add(caseMesh);
-
-    const material = new THREE.MeshBasicMaterial({ map: makeEnamelClockDial(hours, minutes, 0), toneMapped: false });
-    faceMaterial.current = material;
-    group.add(new THREE.Mesh(new THREE.CircleGeometry(0.72, 48), material));
-
-    const glass = new THREE.Mesh(
-      new THREE.CircleGeometry(0.72, 48),
-      new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.12, roughness: 0.05 }),
-    );
-    glass.position.z = 0.015;
-    group.add(glass);
-
-    let raf = 0;
+    const canvas = mountRef.current;
+    if (!canvas) return;
     const draw = () => {
-      raf = requestAnimationFrame(draw);
-      group.rotation.y = Math.sin(performance.now() * 0.0007) * 0.09;
-      renderer.render(scene, camera);
+      const width = Math.max(1, canvas.clientWidth);
+      const height = Math.max(1, canvas.clientHeight);
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.scale(ratio, ratio);
+      ctx.clearRect(0, 0, width, height);
+      const cx = width / 2; const cy = height / 2; const radius = Math.min(width, height) * 0.39;
+      const rim = ctx.createRadialGradient(cx - radius * 0.28, cy - radius * 0.35, radius * 0.12, cx, cy, radius * 1.12);
+      rim.addColorStop(0, '#c9a96d'); rim.addColorStop(0.72, '#634728'); rim.addColorStop(1, '#170f0b');
+      ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, radius * 1.12, 0, Math.PI * 2); ctx.fill();
+      const face = ctx.createRadialGradient(cx - radius * 0.22, cy - radius * 0.28, radius * 0.05, cx, cy, radius);
+      face.addColorStop(0, '#fffdf1'); face.addColorStop(0.78, '#e8dfc8'); face.addColorStop(1, '#b8aa8b');
+      ctx.fillStyle = face; ctx.beginPath(); ctx.arc(cx, cy, radius * 0.94, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (let i = 0; i < 60; i++) {
+        const angle = i * Math.PI / 30 - Math.PI / 2;
+        const major = i % 5 === 0;
+        ctx.strokeStyle = major ? '#322417' : '#75684f'; ctx.lineWidth = major ? 2 : 0.8;
+        ctx.beginPath(); ctx.moveTo(cx + Math.cos(angle) * radius * 0.79, cy + Math.sin(angle) * radius * 0.79); ctx.lineTo(cx + Math.cos(angle) * radius * (major ? 0.9 : 0.86), cy + Math.sin(angle) * radius * (major ? 0.9 : 0.86)); ctx.stroke();
+      }
+      ctx.fillStyle = '#30251b'; ctx.font = `600 ${Math.max(12, radius * 0.15)}px Georgia, serif`;
+      for (let i = 1; i <= 12; i++) { const angle = i * Math.PI / 6 - Math.PI / 2; ctx.fillText(String(i), cx + Math.cos(angle) * radius * 0.68, cy + Math.sin(angle) * radius * 0.68); }
+      const minuteAngle = minutes * Math.PI / 30 - Math.PI / 2;
+      const hourAngle = (hours % 12 + minutes / 60) * Math.PI / 6 - Math.PI / 2;
+      const hand = (angle: number, length: number, color: string, lineWidth: number) => { ctx.strokeStyle = color; ctx.lineWidth = lineWidth; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(cx - Math.cos(angle) * radius * 0.12, cy - Math.sin(angle) * radius * 0.12); ctx.lineTo(cx + Math.cos(angle) * radius * length, cy + Math.sin(angle) * radius * length); ctx.stroke(); };
+      hand(hourAngle, 0.48, '#281a12', Math.max(4, radius * 0.055)); hand(minuteAngle, 0.7, '#322015', Math.max(2.5, radius * 0.035));
+      ctx.fillStyle = '#8d2821'; ctx.beginPath(); ctx.arc(cx, cy, Math.max(4, radius * 0.055), 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.32)'; ctx.beginPath(); ctx.ellipse(cx - radius * 0.26, cy - radius * 0.52, radius * 0.38, radius * 0.09, -0.5, 0, Math.PI * 2); ctx.fill();
     };
     draw();
-
-    const resize = new ResizeObserver(() => {
-      const width = Math.max(1, mount.clientWidth);
-      const height = Math.max(1, mount.clientHeight);
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    });
-    resize.observe(mount);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      resize.disconnect();
-      faceMaterial.current = null;
-      group.traverse((object) => {
-        const mesh = object as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        if (mesh.material) {
-          const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          materials.forEach((m) => {
-            (m as THREE.MeshBasicMaterial).map?.dispose();
-            m.dispose();
-          });
-        }
-      });
-      renderer.dispose();
-      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
-    };
-    // The dial texture is refreshed by the effect below, not here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const material = faceMaterial.current;
-    if (!material) return;
-    const previous = material.map;
-    material.map = makeEnamelClockDial(hours, minutes, 0);
-    material.needsUpdate = true;
-    previous?.dispose();
+    const resize = new ResizeObserver(draw); resize.observe(canvas);
+    return () => resize.disconnect();
   }, [hours, minutes]);
 
   useEffect(() => {
@@ -162,8 +108,8 @@ export const ClockRepairModal: React.FC<Props> = ({ clockId, name, room, wrong, 
   return (
     <Panel title="AJUSTAR RELÓGIO" jp="時計" subtitle={`${name} · ${room}`} onClose={onClose} width="max-w-3xl">
       <div className="grid md:grid-cols-2 gap-8 items-start">
-        <div className="h-72 inspection-view">
-          <div ref={mountRef} className="inspection-canvas" />
+        <div className="h-72 inspection-view grid place-items-center">
+          <canvas ref={mountRef} className="h-full w-full" aria-label={`Relógio marcando ${label()}`} />
         </div>
         <div className="font-serif-jp">
           <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-500">Ponteiros</p>

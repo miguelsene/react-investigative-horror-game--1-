@@ -46,6 +46,7 @@ export const App: React.FC = () => {
   const [isSchoolPcOpen, setIsSchoolPcOpen] = useState(false);
   const [caseCompletedOpen, setCaseCompletedOpen] = useState(false);
   const [isSecondNightCutscene, setIsSecondNightCutscene] = useState(false);
+  const [houseIntro, setHouseIntro] = useState(false);
   const [mapDissolving, setMapDissolving] = useState(false);
   const [activeDialogueNode, setActiveDialogueNode] = useState<DialogueNode | null>(null);
   const [activeMinigame, setActiveMinigame] = useState<ActivityId | null>(null);
@@ -59,6 +60,9 @@ export const App: React.FC = () => {
   const [routeProgress, setRouteProgress] = useState(0);
   const [grades, setGrades] = useState<Record<string, Grade>>({});
   const [isAreaLoading, setIsAreaLoading] = useState(false);
+  const [areaCutscene, setAreaCutscene] = useState<'house' | 'street' | 'school' | 'schoolhall' | 'return' | 'dream' | null>(null);
+  const previousAreaRef = useRef<typeof worldArea | null>(null);
+  const areaCutsceneTimerRef = useRef<number | null>(null);
 
   const [streetThought, setStreetThought] = useState<string | null>(null);
   const streetThoughtTimer = useRef<number | null>(null);
@@ -199,6 +203,28 @@ export const App: React.FC = () => {
     const timer = window.setTimeout(() => setIsAreaLoading(false), 420);
     return () => window.clearTimeout(timer);
   }, [activeScreen, worldArea, gameState.storyFlags.developer_mode]);
+
+  useEffect(() => {
+    if (activeScreen !== 'gameplay') {
+      previousAreaRef.current = worldArea;
+      setAreaCutscene(null);
+      return;
+    }
+    const previous = previousAreaRef.current;
+    previousAreaRef.current = worldArea;
+    if (!previous || previous === worldArea) return;
+    if (worldArea === 'school' || worldArea === 'dream') { setAreaCutscene(null); return; }
+    setAreaCutscene(worldArea);
+    if (areaCutsceneTimerRef.current) window.clearTimeout(areaCutsceneTimerRef.current);
+    areaCutsceneTimerRef.current = window.setTimeout(() => setAreaCutscene(null), 3400);
+    return () => {
+      if (areaCutsceneTimerRef.current) window.clearTimeout(areaCutsceneTimerRef.current);
+    };
+  }, [activeScreen, worldArea]);
+
+  useEffect(() => () => {
+    if (areaCutsceneTimerRef.current) window.clearTimeout(areaCutsceneTimerRef.current);
+  }, []);
 
   // Switch to the house theme after leaving the title screen.
   const enterHouseArea = useCallback(() => {
@@ -374,7 +400,11 @@ export const App: React.FC = () => {
         setClockHuntOpen(false);
         lastNoteRef.current = null;
         enterGameplay(true);
-        setTimeout(() => setActiveDialogueNode(DIALOGUE_NODES['prologue_tick_1']), 900);
+        setHouseIntro(true);
+        window.setTimeout(() => {
+          setHouseIntro(false);
+          setActiveDialogueNode(DIALOGUE_NODES['prologue_tick_1']);
+        }, 6800);
       } else {
         gameState.loadGame(slot);
         enterGameplay();
@@ -905,6 +935,13 @@ export const App: React.FC = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden select-none bg-black text-neutral-200">
+      {activeScreen === 'gameplay' && worldArea !== 'house' && worldArea !== 'dream' && !anyModal && !activeDialogueNode && !streetThought && (
+        <div className="touch-only fixed right-3 top-14 z-[80] flex-row gap-1.5 rounded-full border border-white/15 bg-black/65 p-1.5 shadow-xl backdrop-blur-md" aria-label="Ferramentas da investigação">
+          <button className="grid min-h-10 min-w-10 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir inventário" onClick={() => { setIsInventoryOpen(true); setIsJournalOpen(false); setIsEvidenceBoardOpen(false); }}><Package className="h-4 w-4" /></button>
+          <button className="grid min-h-10 min-w-10 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir diário" onClick={() => { setIsJournalOpen(true); setIsInventoryOpen(false); setIsEvidenceBoardOpen(false); }}><BookMarked className="h-4 w-4" /></button>
+          <button className="grid min-h-10 min-w-10 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir quadro de pistas" onClick={() => { setIsEvidenceBoardOpen(true); setIsInventoryOpen(false); setIsJournalOpen(false); }}><GitFork className="h-4 w-4" /></button>
+        </div>
+      )}
       {activeScreen === 'main_menu' && (
         <TitleScreen
           hasSavedGame={gameState.checkHasSave()}
@@ -914,11 +951,6 @@ export const App: React.FC = () => {
           onNewGame={(slot) => handleStartGame(true, slot)}
           onOpenChapters={() => setIsChapterSelectOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onExtra={() => {
-            bootAudio();
-            soundManager.startDrone(40);
-            setActiveScreen('combat');
-          }}
           onDeveloper={enterDeveloperMode}
           onAudioStart={startMenuMusic}
         />
@@ -1005,7 +1037,7 @@ export const App: React.FC = () => {
       )}
 
       {activeScreen === 'gameplay' && worldArea === 'house' && (
-        <div className={`relative w-full h-full ${mapDissolving ? 'map-scene-dissolving' : ''}`}>
+        <div className={`relative w-full h-full ${mapDissolving ? 'map-scene-dissolving' : ''} ${houseIntro ? 'house-intro-push' : ''}`}>
           <ThreeWorld
             currentFloor={gameState.currentFloor}
             onFloorChange={(floor) => {
@@ -1014,14 +1046,16 @@ export const App: React.FC = () => {
             }}
             onInteract={() => undefined}
             isInspecting={!!activeInspectionData}
-            isInDialogue={!!activeDialogueNode || anyModal}
+            isInDialogue={!!activeDialogueNode || anyModal || !!areaCutscene}
             activeHotspots={activeHotspots}
             currentTime={derivedTime}
             cameraMotionEnabled={cameraMotionEnabled}
+            cameraCinematic={!!areaCutscene}
             canUseStairs={gameState.currentFloor !== 2 || morningReady}
             blockedMessage={gameState.currentFloor === 2 && !morningReady ? 'Arrume a cama e prepare a mochila antes de descer.' : undefined}
             fixedClockIds={foundClocks}
           />
+          {houseIntro && <div className="pointer-events-none absolute inset-0 z-[90] overflow-hidden bg-black house-intro-curtain"><div className="house-intro-aerial absolute inset-0 grid place-items-center"><svg viewBox="0 0 420 360" className="h-[82vh] w-[min(92vw,34rem)] drop-shadow-[0_0_40px_rgba(180,45,52,.2)]" aria-hidden="true"><path d="M0 70H420M0 285H420M55 0V360M365 0V360" fill="none" stroke="#35333a" strokeWidth="18"/><path d="M0 70H420M0 285H420M55 0V360M365 0V360" fill="none" stroke="#77717b" strokeWidth="1" strokeDasharray="5 9" opacity=".35"/><path d="M117 75 210 25 303 75V278H117Z" fill="#27252c" stroke="#aa7774" strokeWidth="2"/><path d="M103 82 210 17 317 82 301 98 210 43 119 98Z" fill="#641f27" stroke="#d48a82" strokeWidth="2"/><path d="M145 104h43v43h-43zm87 0h43v43h-43zm-87 82h43v43h-43zm87 0h43v43h-43z" fill="#d5a66c" opacity=".55"/><path d="M191 221h38v57h-38z" fill="#17151a" stroke="#a46f68" strokeWidth="2"/><circle cx="210" cy="132" r="9" fill="#b82b38" opacity=".9"/></svg></div><div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(ellipse at center, transparent 0%, #000 78%), repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,.035) 4px)' }} /><div className="absolute inset-x-0 top-[8%] text-center font-mono text-[9px] tracking-[.55em] text-rose-100/70">KYOTO · 06:43 · CASA</div><div className="absolute inset-x-0 bottom-[10%] text-center"><p className="font-serif-jp text-[10px] tracking-[.45em] text-white/60">A CHUVA COBRE A CIDADE</p><h2 className="mt-3 font-title text-2xl tracking-[.2em] text-white sm:text-4xl">QUARTO DE GABRIELA</h2><p className="mt-3 font-serif-jp text-xs text-white/55">Um relógio interrompe o silêncio.</p></div></div>}
 
           {/* Minimal HUD — time & place */}
           <div className="absolute top-5 left-6 z-20 pointer-events-none hud-shadow">
@@ -1088,8 +1122,9 @@ export const App: React.FC = () => {
       {activeScreen === 'gameplay' && worldArea === 'street' && (
         <div className="relative w-full h-full">
           <NeighborhoodWorld
-            paused={anyModal || !!activeDialogueNode || !!streetThought}
+            paused={anyModal || !!activeDialogueNode || !!streetThought || !!areaCutscene}
             cameraMotionEnabled={cameraMotionEnabled}
+            cameraCinematic={!!areaCutscene}
             onProgress={setRouteProgress}
             onMonologue={pushStreetThought}
             onArriveSchool={() => {
@@ -1108,7 +1143,7 @@ export const App: React.FC = () => {
             <div className="mt-1.5 flex items-center gap-2"><span className="w-1.5 h-1.5 bg-red-500" /><span className="font-serif-jp text-[11px] tracking-[0.35em] text-neutral-300">SAKYO-KU · RUA</span></div>
           </div>
           <PhoneMap progress={routeProgress} streetX={STREET.minX + routeProgress * (STREET.maxX - STREET.minX)} />
-          <div className="absolute bottom-6 inset-x-0 z-20 text-center pointer-events-none hud-shadow">
+          <div className="absolute bottom-36 inset-x-0 z-20 text-center pointer-events-none hud-shadow sm:bottom-6">
             <span className="font-serif-jp text-[10px] tracking-[0.4em] text-red-300/80 uppercase">Objetivo</span>
             <p className="font-serif-jp text-sm text-neutral-100 mt-1">Siga a rota do celular até a escola.</p>
           </div>
@@ -1127,8 +1162,9 @@ export const App: React.FC = () => {
       {activeScreen === 'gameplay' && worldArea === 'schoolhall' && (
         <div className="relative w-full h-full">
           <SchoolWorld
-            paused={anyModal || !!activeDialogueNode}
+            paused={anyModal || !!activeDialogueNode || !!areaCutscene}
             cameraMotionEnabled={cameraMotionEnabled}
+            cameraCinematic={!!areaCutscene}
             onTriggerDialogue={(id, label) => {
               const flags = gameState.storyFlags;
               if (id === 'director_akiyama') gameState.recordInvestigation({ id: 'director_akiyama', title: 'Diretora Akiyama', category: 'people', summary: 'Diretora da Escola Higashi. Conversou com Gabriela sobre seu comportamento e sua rotina.' });
@@ -1195,7 +1231,7 @@ export const App: React.FC = () => {
               );
             })}
           </div>
-          <div className="absolute bottom-6 inset-x-0 z-20 text-center pointer-events-none hud-shadow">
+          <div className="absolute bottom-36 inset-x-0 z-20 text-center pointer-events-none hud-shadow sm:bottom-6">
             <span className="font-serif-jp text-[10px] tracking-[0.4em] text-red-400/80 uppercase">Objetivo</span>
             <p className="font-serif-jp text-sm text-neutral-200 mt-1">{currentObjective}</p>
           </div>
@@ -1205,8 +1241,9 @@ export const App: React.FC = () => {
       {activeScreen === 'gameplay' && worldArea === 'return' && (
         <div className="relative w-full h-full">
           <NeighborhoodWorld
-            paused={anyModal || !!activeDialogueNode || !!streetThought}
+            paused={anyModal || !!activeDialogueNode || !!streetThought || !!areaCutscene}
             cameraMotionEnabled={cameraMotionEnabled}
+            cameraCinematic={!!areaCutscene}
             direction="home"
             onProgress={setRouteProgress}
             onMonologue={pushStreetThought}
@@ -1348,6 +1385,19 @@ export const App: React.FC = () => {
           <div className="absolute inset-0 animate-[mapDissolve_2.4s_ease-in_forwards] opacity-70" style={{ backgroundImage: 'radial-gradient(circle at 20% 30%, white 0 2px, transparent 3px), radial-gradient(circle at 65% 70%, white 0 3px, transparent 4px), radial-gradient(circle at 80% 20%, white 0 2px, transparent 3px)', backgroundSize: '19px 23px, 29px 31px, 37px 41px' }} />
         </div>
       )}
+
+      {areaCutscene && (() => {
+        const cards = {
+          house: ['CASA DE KYOTO', 'A madeira range sob a chuva. A rotina continua, mesmo quando algo parece fora do lugar.'],
+          street: ['RUA SOB A CHUVA', 'O caminho se alonga entre as casas silenciosas de Sakyo-ku.'],
+          school: ['FIM DAS AULAS', 'As notas ficam para trás. Agora é hora de voltar para casa.'],
+          schoolhall: ['ESCOLA HIGASHI', 'O sinal ecoa pelos corredores e a manhã começa a se mover.'],
+          return: ['CAMINHO DE VOLTA', 'A tarde esfria. Cada passo leva Gabriela de volta à avó.'],
+          dream: ['A MEMÓRIA SE ROMPE', 'O quarto desaparece; uma paisagem impossível toma seu lugar.'],
+        } as const;
+        const [title, line] = cards[areaCutscene];
+        return <div className="area-cutscene-curtain pointer-events-none fixed inset-0 z-[85] overflow-hidden text-center" aria-live="polite"><div className="area-cutscene-bar absolute inset-x-0 top-0 h-[12vh] bg-gradient-to-b from-black/90 to-transparent" /><div className="area-cutscene-bar area-cutscene-bar-bottom absolute inset-x-0 bottom-0 h-[22vh] bg-gradient-to-t from-black/95 via-black/55 to-transparent" /><div className="area-cutscene-card absolute inset-x-4 bottom-[7vh] mx-auto max-w-xl px-4 pb-2 sm:bottom-[8vh]"><span className="font-mono text-[8px] tracking-[.45em] text-rose-200/85 sm:text-[9px] sm:tracking-[.55em]">QUEM É VOCÊ? · CAPÍTULO 01</span><h2 className="mt-2 font-title text-2xl tracking-[.2em] text-neutral-100 sm:mt-3 sm:text-4xl">{title}</h2><div className="mx-auto mt-2 h-px w-32 bg-gradient-to-r from-transparent via-rose-200/70 to-transparent sm:mt-3" /><p className="mx-auto mt-2 max-w-md font-serif-jp text-xs leading-5 text-neutral-200/90 sm:mt-3 sm:text-sm sm:leading-7">{line}</p></div></div>;
+      })()}
 
       {activeScreen === 'gameplay' && worldArea !== 'house' && (
         <div className="fixed top-5 right-5 z-40 flex items-center gap-2">

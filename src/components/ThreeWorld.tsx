@@ -6,6 +6,7 @@ import { buildFloor, buildExterior, Collider } from '../three/house';
 import { softCircle } from '../three/textures';
 import { createGabrielaSprite, preloadGabrielaSprite } from '../three/gabrielaSprite';
 import { ExplorationCamera } from '../three/cameraRig';
+import { applyAreaCameraCinematic } from '../three/areaCameraCinematic';
 
 export interface WorldHotspot {
   id: string;
@@ -32,6 +33,7 @@ interface ThreeWorldProps {
   canUseStairs?: boolean;
   blockedMessage?: string | null;
   fixedClockIds?: string[];
+  cameraCinematic?: boolean;
 }
 
 const PLAYER_R = 0.27;
@@ -302,6 +304,8 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
     const clock = new THREE.Timer();
     clock.connect(document);
     let clockSignature = '';
+    let cameraSequenceStartedAt = 0;
+    const cameraSequenceStart = new THREE.Vector3();
     let animId = 0;
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -397,6 +401,10 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
       house.updateRoomFocus(house.roomOf(pos.x, pos.z), dt);
 
       cameraRig.update(pos, vx, vz, dt, t, zoomLevelRef.current, l.cameraMotionEnabled !== false && !reducedMotion, locked);
+      if (l.cameraCinematic) {
+        if (!cameraSequenceStartedAt) { cameraSequenceStartedAt = performance.now(); cameraSequenceStart.copy(camera.position); }
+        applyAreaCameraCinematic(camera, pos, cameraSequenceStart, Math.min(1, (performance.now() - cameraSequenceStartedAt) / 2800), 'house');
+      } else cameraSequenceStartedAt = 0;
 
       if (!locked) {
         let closest: WorldHotspot | null = null;
@@ -605,14 +613,15 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
       <button disabled={locked || props.canUseStairs === false} onClick={() => changeFloor(currentFloor === 1 ? 2 : 1)} className="absolute bottom-5 right-5 z-20 hud-btn text-[11px] font-serif-jp tracking-widest px-3 w-auto disabled:opacity-30" title="Usar escadas">
         {currentFloor === 1 ? '▲ 2º ANDAR' : '▼ TÉRREO'}
       </button>
+      <button disabled={locked} onClick={interact} className="touch-only absolute bottom-[4.5rem] right-5 z-20 min-h-11 items-center justify-center rounded-full border border-white/25 bg-black/70 px-4 font-serif-jp text-[10px] tracking-[0.15em] text-white shadow-xl backdrop-blur-md disabled:opacity-40">INTERAGIR</button>
 
       {/* Touch controls */}
       <div className="touch-only absolute bottom-5 left-5 z-20 flex-col items-center gap-1 select-none">
-        <button className="dpad" onPointerDown={() => setKey('w', true)} onPointerUp={() => setKey('w', false)} onPointerLeave={() => setKey('w', false)}>▲</button>
+        <button className="dpad" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setKey('w', true); }} onPointerUp={() => setKey('w', false)} onPointerCancel={() => setKey('w', false)} onLostPointerCapture={() => setKey('w', false)}>▲</button>
         <div className="flex gap-1">
-          <button className="dpad" onPointerDown={() => setKey('a', true)} onPointerUp={() => setKey('a', false)} onPointerLeave={() => setKey('a', false)}>◀</button>
-          <button className="dpad" onPointerDown={() => setKey('s', true)} onPointerUp={() => setKey('s', false)} onPointerLeave={() => setKey('s', false)}>▼</button>
-          <button className="dpad" onPointerDown={() => setKey('d', true)} onPointerUp={() => setKey('d', false)} onPointerLeave={() => setKey('d', false)}>▶</button>
+          <button className="dpad" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setKey('a', true); }} onPointerUp={() => setKey('a', false)} onPointerCancel={() => setKey('a', false)} onLostPointerCapture={() => setKey('a', false)}>◀</button>
+          <button className="dpad" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setKey('s', true); }} onPointerUp={() => setKey('s', false)} onPointerCancel={() => setKey('s', false)} onLostPointerCapture={() => setKey('s', false)}>▼</button>
+          <button className="dpad" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setKey('d', true); }} onPointerUp={() => setKey('d', false)} onPointerCancel={() => setKey('d', false)} onLostPointerCapture={() => setKey('d', false)}>▶</button>
         </div>
       </div>
     </div>

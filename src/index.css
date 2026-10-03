@@ -207,6 +207,12 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 .area-loading { position: fixed; inset: 0; z-index: 10000; display: grid; place-content: center; gap: 13px; color: rgba(240,235,224,.8); background: rgba(5,6,8,.72); font: 10px 'Shippori Mincho', serif; letter-spacing: .42em; text-transform: uppercase; animation: areaLoad .42s ease both; pointer-events: none; }
 .area-loading-mark { width: 110px; height: 1px; background: linear-gradient(90deg, transparent, #bd3037, transparent); animation: loadingScan .72s ease-in-out infinite; }
 @keyframes areaLoad { from { opacity: 0 } to { opacity: 1 } }
+@keyframes houseIntroPush { 0% { transform: scale(1.16); filter: brightness(.18) saturate(.5) } 22% { filter: brightness(.52) saturate(.65) } 100% { transform: scale(1); filter: brightness(1) saturate(1) } }
+@keyframes houseIntroCurtain { 0%, 8% { opacity: 1 } 24% { opacity: .82 } 100% { opacity: 0 } }
+.house-intro-push { animation: houseIntroPush 6.8s cubic-bezier(.16,.72,.24,1) both; transform-origin: 50% 48%; }
+.house-intro-curtain { animation: houseIntroCurtain 6.8s ease-out both; }
+@keyframes houseIntroAerial { 0%, 5% { opacity: 0; transform: scale(.72) translateY(-3vh); filter: blur(8px) } 18% { opacity: 1; filter: blur(0) } 58% { opacity: 1; transform: scale(1.06) } 82%,100% { opacity: 0; transform: scale(5.2); filter: blur(12px) } }
+.house-intro-aerial { animation: houseIntroAerial 6.8s cubic-bezier(.2,.68,.24,1) both; }
 @keyframes mapDissolve { 0% { opacity: 0; filter: blur(0) } 45% { opacity: .72; filter: blur(1px) } 100% { opacity: 1; filter: blur(8px) } }
 @keyframes mapSceneDissolve { 0% { opacity: 1; filter: brightness(1) grayscale(0) blur(0); transform: scale(1) } 42% { opacity: .9; filter: brightness(1.8) grayscale(.5) blur(1px); transform: scale(1.01) } 100% { opacity: 0; filter: brightness(4) grayscale(1) blur(10px); transform: scale(1.035) } }
 .map-scene-dissolving { animation: mapSceneDissolve 2.4s ease-in forwards; }
@@ -214,6 +220,13 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 @keyframes dreamCueDrain { from { transform: scaleX(1) } to { transform: scaleX(0) } }
 .dream-warp-layer { opacity: .65; mix-blend-mode: screen; animation: dreamWarp 6s ease-in-out infinite; }
 @keyframes nightmareVignette { from { opacity: 0 } to { opacity: 1 } }
+.area-cutscene-curtain { animation: areaCutsceneCurtain 3.4s ease-in-out both; }
+.area-cutscene-card { animation: areaCutsceneCard 3.4s ease-out both; }
+.area-cutscene-bar { animation: areaCutsceneBar 3.4s ease-in-out both; }
+.area-cutscene-bar-bottom { animation-delay: 0s; }
+@keyframes areaCutsceneCurtain { 0% { opacity: 0 } 8% { opacity: 1 } 84% { opacity: 1 } 100% { opacity: 0 } }
+@keyframes areaCutsceneCard { 0% { opacity: 0; transform: translateY(18px); filter: blur(5px) } 16% { opacity: 1; transform: translateY(0); filter: blur(0) } 80% { opacity: 1 } 100% { opacity: 0; transform: translateY(-8px); filter: blur(2px) } }
+@keyframes areaCutsceneBar { 0%,100% { opacity: 0; transform: scaleY(.3) } 13%,82% { opacity: 1; transform: scaleY(1) } }
 .minigame-pixel-panel { padding: 1.25rem; border: 1px solid rgba(196,160,112,.3); background: linear-gradient(145deg, rgba(14,13,16,.97), rgba(24,19,19,.96)); box-shadow: 0 28px 90px rgba(0,0,0,.72), inset 0 0 36px rgba(105,67,50,.08); }
 .minigame-pixel-panel svg[shape-rendering="crispEdges"] { image-rendering: pixelated; }
 @keyframes loadingScan { 50% { transform: scaleX(.35); opacity: .35 } }

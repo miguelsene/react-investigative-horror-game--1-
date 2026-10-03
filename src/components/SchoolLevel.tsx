@@ -6,7 +6,7 @@ import { createSilhouette } from '../three/silhouetteSprite';
 import { softCircle } from '../three/textures';
 import { ExplorationCamera } from '../three/cameraRig';
 import { DialogueBox } from './DialogueBox';
-import { SCHOOL_NPCS, LESSONS, QUIZZES, gradeFor, type LessonId } from '../data/school';
+import { SCHOOL_NPCS, LESSONS, QUIZZES, gradeFor, type LessonId, type SchoolNpc } from '../data/school';
 import type { DialogueNode, DialogueOption } from '../types/game';
 
 type Phase = 'explore' | 'quiz' | 'report' | 'menu';
@@ -37,6 +37,7 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
   const [picked, setPicked] = useState<number | null>(null);
   const [exitOpen, setExitOpen] = useState(false);
   const interactRef = useRef<(() => void) | null>(null);
+  const touchKeysRef = useRef<Record<string, boolean>>({ w: false, a: false, s: false, d: false });
 
   const lastTalk = useRef<string | null>(null);
 
@@ -433,7 +434,10 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
       keys[k] = true;
     };
     const onKeyUp = (e: KeyboardEvent) => { keys[e.key.toLowerCase()] = false; };
-    const onBlur = () => Object.keys(keys).forEach((k) => (keys[k] = false));
+    const onBlur = () => {
+      Object.keys(keys).forEach((k) => (keys[k] = false));
+      Object.keys(touchKeysRef.current).forEach((k) => (touchKeysRef.current[k] = false));
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
@@ -473,10 +477,10 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
       let dz = 0;
       if (!locked) {
         const sp = 3.2 * dt;
-        if (keys.w || keys.arrowup) dz -= sp;
-        if (keys.s || keys.arrowdown) dz += sp;
-        if (keys.a || keys.arrowleft) dx -= sp;
-        if (keys.d || keys.arrowright) dx += sp;
+        if (keys.w || keys.arrowup || touchKeysRef.current.w) dz -= sp;
+        if (keys.s || keys.arrowdown || touchKeysRef.current.s) dz += sp;
+        if (keys.a || keys.arrowleft || touchKeysRef.current.a) dx -= sp;
+        if (keys.d || keys.arrowright || touchKeysRef.current.d) dx += sp;
       }
       if (dx && dz) { dx *= 0.7071; dz *= 0.7071; }
       const nx = THREE.MathUtils.clamp(pos.x + dx, -19.3, 19.3);
@@ -571,11 +575,18 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
     <div className="relative h-full w-full">
       <div ref={mountRef} className="h-full w-full" />
 
+      {phase === 'explore' && !dialogue && <div className="touch-only absolute bottom-4 left-4 z-30 flex-col items-center gap-1 select-none" aria-label="Controles de movimento">
+        {(['w'] as const).map((key) => <button key={key} className="dpad h-12 w-12 rounded-xl bg-black/70 font-bold text-white" onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); touchKeysRef.current[key] = true; }} onPointerUp={() => { touchKeysRef.current[key] = false; }} onPointerCancel={() => { touchKeysRef.current[key] = false; }} onLostPointerCapture={() => { touchKeysRef.current[key] = false; }} aria-label="Andar para frente">W</button>)}
+        <div className="flex gap-1">{([['a','A','Andar para esquerda'],['s','S','Andar para trás'],['d','D','Andar para direita']] as const).map(([key, glyph, label]) => <button key={key} className="dpad h-12 w-12 rounded-xl bg-black/70 font-bold text-white" onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); touchKeysRef.current[key] = true; }} onPointerUp={() => { touchKeysRef.current[key] = false; }} onPointerCancel={() => { touchKeysRef.current[key] = false; }} onLostPointerCapture={() => { touchKeysRef.current[key] = false; }} aria-label={label}>{glyph}</button>)}</div>
+      </div>}
+      {phase === 'explore' && !dialogue && <button onClick={() => interactRef.current?.()} className="touch-only absolute bottom-5 right-4 z-30 min-h-12 items-center justify-center rounded-full border border-white/25 bg-black/75 px-5 text-xs tracking-widest text-white shadow-xl backdrop-blur-md">INTERAGIR</button>}
+
       {/* Prompt de interação */}
       <div ref={promptRef} className="absolute left-1/2 top-[36%] -translate-x-1/2 z-30 bg-white/95 text-[#111] font-serif-jp text-sm px-5 py-2 rounded-full shadow-2xl border-2 border-neutral-900 pointer-events-none" style={{ visibility: 'hidden' }} />
+      {phase === 'explore' && <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2 rounded-full border border-white/15 bg-black/65 px-3 py-1.5 text-center font-serif-jp text-[9px] tracking-wide text-neutral-200 backdrop-blur sm:hidden">AULA: {LESSONS.find((item) => item.id === lesson)?.name} · {report.filter(Boolean).length}/{LESSONS.length}</div>}
 
       {/* Painel de aulas (esquerda) */}
-      <div className="absolute top-5 left-5 z-20 w-56 space-y-1.5">
+      <div className="hidden absolute top-5 left-5 z-20 w-56 space-y-1.5 sm:block">
         <div className="text-[10px] tracking-[0.35em] text-neutral-300/80 font-serif-jp uppercase mb-2">AULAS DE HOJE</div>
         {LESSONS.map((l, i) => {
           const done = report[i];
@@ -604,8 +615,8 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
 
       {/* Quiz */}
       {!dialogue && phase === 'quiz' && !quizDone && q && (
-        <div className="absolute inset-0 z-40 bg-black/85 flex items-center justify-center p-6">
-          <div className="w-full max-w-xl bg-[#0e1116] border border-neutral-700 p-8 rounded">
+        <div className="absolute inset-0 z-40 bg-black/85 flex items-center justify-center p-3 sm:p-6">
+          <div className="w-full max-w-xl max-h-[92dvh] overflow-y-auto bg-[#0e1116] border border-neutral-700 p-4 sm:p-8 rounded">
             <div className="text-[10px] tracking-[0.35em] text-neutral-400 uppercase font-serif-jp">
               {LESSONS.find((l) => l.id === lesson)?.name} · Pergunta {questionIdx + 1}/{questions.length}
             </div>
@@ -663,7 +674,7 @@ export const SchoolLevel: React.FC<Props> = ({ paused, cameraMotionEnabled, onDo
         <div className="absolute inset-0 z-40 bg-black/90 flex items-center justify-center p-6">
           <div className="text-center max-w-md font-serif-jp">
             <p className="text-[10px] tracking-[0.35em] text-neutral-500 uppercase">Boletim — {LESSONS.find((l) => l.id === lesson)?.name}</p>
-            <p className={`text-8xl font-title mt-4 ${grade === 'A+' || grade === 'A' ? 'text-emerald-200' : grade === 'A-' || grade === 'B' ? 'text-sky-200' : grade === 'C' || grade === 'D' ? 'text-amber-200' : 'text-red-300'}`}>
+            <p className={`text-7xl sm:text-8xl font-title mt-4 ${grade === 'A+' || grade === 'A' ? 'text-emerald-200' : grade === 'A-' || grade === 'B' ? 'text-sky-200' : grade === 'C' || grade === 'D' ? 'text-amber-200' : 'text-red-300'}`}>
               {grade}
             </p>
             <p className="text-neutral-300 text-sm mt-2">{score}/{questions.length} acertos</p>

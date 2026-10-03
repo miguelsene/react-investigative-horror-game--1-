@@ -46,6 +46,7 @@ export const EvidenceBoard: React.FC<Props> = ({ nodes, connections, onConnect, 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; moved: boolean } | null>(null);
   const [local, setLocal] = useState<Record<string, { x: number; y: number }>>({});
+  const [reading, setReading] = useState<EvidenceNode | null>(null);
 
   const pos = (n: EvidenceNode) => local[n.id] ?? { x: n.x, y: n.y };
   const pinOf = (n: EvidenceNode) => {
@@ -132,21 +133,21 @@ export const EvidenceBoard: React.FC<Props> = ({ nodes, connections, onConnect, 
   const selNode = selected ? nodes.find((n) => n.id === selected) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-[3px] p-3 sm:p-6 select-none fade-up" onClick={onClose}>
-      <div className="relative w-full max-w-6xl h-[92vh] max-h-[840px] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-[3px] p-2 sm:p-6 select-none fade-up" onClick={onClose}>
+      <div className="relative flex h-[calc(100dvh-1rem)] max-h-none w-full max-w-6xl flex-col sm:h-[92vh] sm:max-h-[840px]" onClick={(e) => e.stopPropagation()}>
         {/* header (HUD style) */}
-        <div className="flex items-end justify-between pb-2 px-1">
+        <div className="flex shrink-0 items-center justify-between gap-2 px-1 pb-2 sm:items-end sm:pb-2">
           <div className="flex items-baseline gap-3">
             <span className="w-1.5 h-1.5 bg-red-500 translate-y-[-3px]" />
-            <h2 className="font-title text-xl tracking-[0.3em] text-neutral-100">QUADRO</h2>
-            <span className="font-serif-jp text-xs tracking-[0.35em] text-neutral-500">仮説盤</span>
-            <span className="font-serif-jp text-[11px] text-neutral-500 ml-4 hidden sm:inline">arraste as notas · clique em dois alfinetes para amarrar um fio</span>
+            <h2 className="font-title text-lg sm:text-xl tracking-[0.16em] sm:tracking-[0.3em] text-neutral-100">QUADRO</h2>
+            <span className="hidden sm:inline font-serif-jp text-xs tracking-[0.35em] text-neutral-500">仮説盤</span>
+            <span className="font-serif-jp text-[9px] sm:text-[11px] text-neutral-400 sm:text-neutral-500 sm:ml-4 hidden sm:inline">arraste as notas · clique em dois alfinetes para amarrar um fio</span>
           </div>
-          <button onClick={onClose} className="font-serif-jp text-[11px] tracking-[0.3em] text-neutral-500 hover:text-white">Q / ESC ✕</button>
+          <button onClick={onClose} className="min-h-10 shrink-0 px-2 font-serif-jp text-[10px] sm:text-[11px] tracking-[0.12em] sm:tracking-[0.3em] text-neutral-300 hover:text-white">Q / ESC ✕</button>
         </div>
 
         {/* wooden frame */}
-        <div className="relative flex-1 rounded-[3px] p-[14px] shadow-[0_30px_80px_rgba(0,0,0,0.8)]" style={{ background: 'linear-gradient(135deg,#5a3a22,#3b2414 40%,#4a2f1b 70%,#2c1a0e)', boxShadow: 'inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 4px rgba(255,220,180,.06), 0 30px 80px rgba(0,0,0,.8)' }}>
+        <div className="relative hidden min-h-0 flex-1 rounded-[3px] p-[14px] shadow-[0_30px_80px_rgba(0,0,0,0.8)] sm:flex" style={{ background: 'linear-gradient(135deg,#5a3a22,#3b2414 40%,#4a2f1b 70%,#2c1a0e)', boxShadow: 'inset 0 0 0 2px rgba(0,0,0,.6), inset 0 0 0 4px rgba(255,220,180,.06), 0 30px 80px rgba(0,0,0,.8)' }}>
           {/* cork */}
           <div
             ref={boardRef}
@@ -261,6 +262,44 @@ export const EvidenceBoard: React.FC<Props> = ({ nodes, connections, onConnect, 
             </div>
           </div>
         </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded border border-white/15 bg-[#141217]/95 sm:hidden">
+          <div className="shrink-0 border-b border-white/10 px-3 py-2 font-serif-jp text-[10px] leading-5 text-neutral-300">
+            Toque em duas pistas para ligar os fatos. Arraste não é necessário.
+            {selected && <span className="ml-1 text-red-200">Escolha a segunda pista.</span>}
+          </div>
+          {feedback && <div role="status" className="shrink-0 border-b border-amber-200/20 bg-amber-100 px-3 py-2 font-serif-jp text-sm text-[#261b10]">{feedback}</div>}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
+            <div className="grid grid-cols-1 gap-2">
+              {nodes.map((node, index) => {
+                const paper = paperFor(node.category);
+                const isSelected = selected === node.id;
+                const category = node.category === 'timeline' ? 'HORA' : node.category === 'people' ? 'PESSOA' : node.category === 'location' ? 'LUGAR' : 'EVIDÊNCIA';
+                return <article key={node.id} className={`relative flex min-h-[6.5rem] w-full items-start gap-2 rounded-sm border p-2.5 text-left shadow-md ${isSelected ? 'border-red-700 ring-1 ring-red-700/40' : 'border-black/20'}`} style={{ background: paper.bg, color: paper.ink }}>
+                  <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white shadow" style={{ background: pinColorFor(node.category) }}>{String(index + 1).padStart(2, '0')}</span>
+                  <span className="min-w-0 flex-1 pb-8">
+                    <span className="flex flex-wrap items-center justify-between gap-x-2 text-[9px] font-semibold tracking-[0.15em] opacity-65"><span>{category}</span>{node.time && <span>{node.time}</span>}</span>
+                    <span className="mt-1 block font-title text-xs font-bold tracking-wide">{node.title}</span>
+                    <span className="mt-1 block font-serif-jp text-xs leading-5 opacity-85">{node.summary}</span>
+                  </span>
+                  <span className="absolute bottom-1.5 left-2.5 right-2.5 flex gap-2"><button onClick={() => setReading(node)} className="min-h-8 flex-1 rounded border border-black/20 bg-black/5 font-serif-jp text-[10px] font-semibold">LER</button><button onClick={() => onPinClick(node)} aria-pressed={isSelected} className="min-h-8 flex-1 rounded border border-black/20 bg-black/5 font-serif-jp text-[10px] font-semibold">{isSelected ? 'SELECIONADA' : 'LIGAR'}</button></span>
+                </article>;
+              })}
+              {nodes.length === 0 && <p className="py-8 text-center font-serif-jp text-sm text-neutral-400">Nenhuma pista registrada ainda.</p>}
+            </div>
+            <section className="mt-5 border-t border-white/10 pt-4">
+              <h3 className="mb-2 font-title text-[10px] tracking-[0.2em] text-neutral-300">LIGAÇÕES ({connections.length})</h3>
+              {connections.length === 0 ? <p className="font-serif-jp text-xs text-neutral-500">As relações que você fizer aparecerão aqui.</p> : <ul className="space-y-2">{connections.map((connection) => {
+                const from = nodes.find((node) => node.id === connection.from)?.title ?? 'Pista';
+                const to = nodes.find((node) => node.id === connection.to)?.title ?? 'Pista';
+                return <li key={connection.id} className="flex items-center gap-2 rounded border border-white/10 bg-white/[.03] p-2.5">
+                  <span className="min-w-0 flex-1 font-serif-jp text-[11px] leading-4 text-neutral-300">{from} <span className="text-red-300">↔</span> {to}</span>
+                  <button onClick={() => onRemoveConnection(connection.id)} aria-label={`Remover ligação entre ${from} e ${to}`} className="min-h-9 min-w-9 rounded border border-white/10 text-neutral-400 hover:text-red-200">×</button>
+                </li>;
+              })}</ul>}
+            </section>
+          </div>
+        </div>
+        {reading && <div className="fixed inset-0 z-[80] grid place-items-center bg-black/80 p-5" onClick={() => setReading(null)}><article className="relative w-full max-w-sm p-6 shadow-2xl" style={{ background: paperFor(reading.category).bg, color: paperFor(reading.category).ink }} onClick={(e) => e.stopPropagation()}><button onClick={() => setReading(null)} className="absolute right-3 top-2 min-h-10 min-w-10 text-xl" aria-label="Fechar leitura">×</button><span className="font-mono text-[10px] uppercase tracking-wider opacity-60">{reading.category}{reading.time ? ` · ${reading.time}` : ''}</span><h3 className="mt-4 font-title text-2xl">{reading.title}</h3><p className="mt-4 font-serif-jp text-base leading-7">{reading.summary}</p></article></div>}
       </div>
     </div>
   );

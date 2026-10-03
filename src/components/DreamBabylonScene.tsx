@@ -9,7 +9,7 @@ import { DialogueNode, DialogueOption } from '../types/game';
 import { soundManager } from '../audio/soundManager';
 
 interface Props { onComplete: () => void; initialPhase?: 'dialogue' | 'playing' | 'boss' }
-type Phase = 'dialogue' | 'playing' | 'boss' | 'failed' | 'complete';
+type Phase = 'dialogue' | 'transition' | 'playing' | 'boss' | 'failed' | 'complete';
 type Facing = 'down' | 'up' | 'left' | 'right';
 type Cue = { x: number; y: number; id: number; duration: number; markerIndex: number };
 type AttackStage = 'warning' | 'impact' | 'recovery';
@@ -80,6 +80,7 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
   const [damageNotice, setDamageNotice] = useState<string | null>(null);
   const [darkness, setDarkness] = useState(initialPhase === 'boss' ? 1 : 0);
   const [phase, setPhase] = useState<Phase>(initialPhase);
+  const [transitionTarget, setTransitionTarget] = useState<'playing' | 'boss' | null>(null);
   const [dialogueIndex, setDialogueIndex] = useState(0);
   const [sceneRevision, setSceneRevision] = useState(0);
   const [shadowReply, setShadowReply] = useState<{ answer: string; response: string; showingResponse: boolean } | null>(null);
@@ -95,6 +96,18 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
   const bossResultRef = useRef<number | null>(null);
   const lastStrikeRef = useRef(0);
   const resolveRef = useRef<(success: boolean) => void>(() => {});
+  const touchKeysRef = useRef<Record<string, boolean>>({ w: false, a: false, s: false, d: false });
+
+  useEffect(() => {
+    if (phase !== 'transition' || !transitionTarget) return;
+    const timer = window.setTimeout(() => {
+      runtimeRef.current.phase = transitionTarget;
+      if (transitionTarget === 'boss') setBossStep(0);
+      setPhase(transitionTarget);
+      setTransitionTarget(null);
+    }, 1900);
+    return () => window.clearTimeout(timer);
+  }, [phase, transitionTarget]);
 
   useEffect(() => {
     if (phase === 'playing' || phase === 'boss') soundManager.setMusicOverlayFile('/musicas/combate_sono.mp3', 0.48);
@@ -115,8 +128,8 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
     setRound(nextRound); setHits(nextHits); setMisses(nextMisses); setSanity(nextSanity); setCue(null); setDarkness(nextDarkness);
     if (nextSanity <= 0) { runtimeRef.current.phase = 'failed'; setPhase('failed'); }
     else if (nextRound >= TOTAL_CUES) {
-      runtimeRef.current.phase = 'boss'; runtimeRef.current.darkness = Math.max(1, nextDarkness);
-      setDarkness(Math.max(1, nextDarkness)); setBossStep(0); setPhase('boss');
+      runtimeRef.current.phase = 'transition'; runtimeRef.current.darkness = Math.max(1, nextDarkness);
+      setDarkness(Math.max(1, nextDarkness)); setTransitionTarget('boss'); setPhase('transition');
     }
   }, []);
   resolveRef.current = resolveCue;
@@ -364,6 +377,10 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
     const collisionCircles = [...columns.map((column) => ({ x: column.position.x, z: column.position.z, r: 0.9 })), { x: -8.2, z: -9.1, r: 1.15 }, { x: 8.2, z: -9.1, r: 1.15 }];
     let walkTarget: Vector3 | null = null;
     let elapsed = 0;
+    let cameraCutStartedAt: number | null = null;
+    let cameraCutStartAlpha = camera.alpha;
+    let cameraCutBaseRadius = camera.radius;
+    let cameraCutBaseBeta = camera.beta;
     let lastSeenMisses = 0;
     let lastHeroFrame = '';
     let lastHeroFacing: Facing = 'down';
@@ -388,6 +405,8 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
       if (key === '-' || key === '_') setZoom((value) => clamp(value + 2, 11, 30));
     };
     const keyUp = (event: KeyboardEvent) => keys.delete(event.key.toLowerCase());
+    const clearTouchKeys = () => Object.keys(touchKeysRef.current).forEach((key) => { touchKeysRef.current[key] = false; });
+    window.addEventListener('blur', clearTouchKeys);
     const wheel = (event: WheelEvent) => { event.preventDefault(); setZoom((value) => clamp(value + Math.sign(event.deltaY) * 2, 11, 30)); };
     window.addEventListener('keydown', keyDown); window.addEventListener('keyup', keyUp); canvas.addEventListener('wheel', wheel, { passive: false });
 
@@ -410,9 +429,22 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
       scene.clearColor = live ? new Color4(0.045 + current.misses * 0.006, 0.035 + current.misses * 0.003, 0.075 + current.misses * 0.004, 1) : new Color4(0.018, 0.012, 0.03, 1);
       scene.fogDensity = 0.009 + current.misses * 0.0035 + (current.phase === 'boss' ? current.bossStep * 0.00032 : 0);
       camera.radius += (zoomRef.current - camera.radius) * (1 - Math.exp(-dt * 5));
+      if (current.phase === 'transition') {
+        if (cameraCutStartedAt === null) {
+          cameraCutStartedAt = elapsed;
+          cameraCutStartAlpha = camera.alpha;
+          cameraCutBaseRadius = zoomRef.current;
+          cameraCutBaseBeta = camera.beta;
+        }
+        const cutProgress = clamp((elapsed - cameraCutStartedAt) / 1.9, 0, 1);
+        const cutEase = cutProgress * cutProgress * (3 - 2 * cutProgress);
+        camera.alpha = cameraCutStartAlpha + Math.PI * 2 * cutEase;
+        camera.radius = cameraCutBaseRadius + Math.sin(Math.PI * cutEase) * 7;
+        camera.beta = cameraCutBaseBeta - Math.sin(Math.PI * cutEase) * 0.1;
+      } else cameraCutStartedAt = null;
 
-      const keyX = Number(keys.has('d') || keys.has('arrowright')) - Number(keys.has('a') || keys.has('arrowleft'));
-      const keyY = Number(keys.has('w') || keys.has('arrowup')) - Number(keys.has('s') || keys.has('arrowdown'));
+      const keyX = Number(keys.has('d') || keys.has('arrowright') || touchKeysRef.current.d) - Number(keys.has('a') || keys.has('arrowleft') || touchKeysRef.current.a);
+      const keyY = Number(keys.has('w') || keys.has('arrowup') || touchKeysRef.current.w) - Number(keys.has('s') || keys.has('arrowdown') || touchKeysRef.current.s);
       let dx = keyX * cameraRight.x + keyY * cameraForward.x;
       let dz = keyX * cameraRight.z + keyY * cameraForward.z;
       if (keyX || keyY) walkTarget = null;
@@ -537,7 +569,7 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
     });
     const resize = () => engine.resize(); window.addEventListener('resize', resize);
     return () => {
-      disposed = true; window.removeEventListener('resize', resize); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); canvas.removeEventListener('wheel', wheel); canvas.removeEventListener('pointerdown', moveToPointer);
+      disposed = true; window.removeEventListener('resize', resize); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('blur', clearTouchKeys); canvas.removeEventListener('wheel', wheel); canvas.removeEventListener('pointerdown', moveToPointer);
       engine.stopRenderLoop(); scene.dispose(); engine.dispose();
     };
   }, [sceneRevision]);
@@ -573,8 +605,8 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
     if (!shadowReply) return;
     if (!shadowReply.showingResponse) { setShadowReply({ ...shadowReply, showingResponse: true }); return; }
     if (dialogueIndex + 1 >= SHADOW_DIALOGUE.length) {
-      setShadowReply(null); runtimeRef.current.phase = 'playing'; runtimeRef.current.darkness = 0;
-      setDarkness(0); setPhase('playing'); return;
+      setShadowReply(null); runtimeRef.current.phase = 'transition'; runtimeRef.current.darkness = 0;
+      setDarkness(0); setTransitionTarget('playing'); setPhase('transition'); return;
     }
     setDialogueIndex((index) => index + 1); setShadowReply(null);
   };
@@ -592,6 +624,7 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
       </div>
     </div>
     {shadowNode && <DialogueBox cinematic node={shadowNode} onSelectOption={chooseShadowAnswer} onNext={advanceShadowDialogue} onClose={advanceShadowDialogue} />}
+    {phase === 'transition' && <div className="pointer-events-none absolute inset-0 z-30 text-center" aria-live="polite"><div className="absolute inset-x-0 top-0 h-[13vh] bg-gradient-to-b from-black/85 to-transparent" /><div className="absolute inset-x-0 bottom-0 h-[27vh] bg-gradient-to-t from-black/90 via-black/45 to-transparent" /><div className="absolute inset-x-4 bottom-[8vh] mx-auto max-w-xl animate-pulse drop-shadow-[0_2px_12px_rgba(0,0,0,.95)]"><span className="font-mono text-[9px] tracking-[.55em] text-rose-200/90">03:17 · MEMÓRIA EM COLAPSO</span><h2 className="mt-2 font-title text-3xl tracking-[.2em] text-white sm:text-5xl">{transitionTarget === 'boss' ? 'A SOMBRA SE REVELA' : 'O SONHO COMEÇA'}</h2><p className="mx-auto mt-2 max-w-md font-serif-jp text-xs leading-6 text-neutral-100/90 sm:mt-3 sm:text-sm sm:leading-7">{transitionTarget === 'boss' ? 'A fumaça se adensa. O chão se abre e a perseguição começa.' : 'A lembrança se desfaz. Gabriela precisa encontrar uma saída.'}</p></div></div>}
     {(phase === 'playing' || phase === 'boss') && <div className="absolute inset-0 z-20 pointer-events-none">
       {phase === 'playing' && cue && <button onClick={strike} className="pointer-events-auto absolute z-10 grid h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-rose-100/90 bg-rose-950/65 shadow-[0_0_45px_rgba(255,55,75,.8)] animate-pulse" style={{ left: `${cue.x}%`, top: `${cue.y}%` }} aria-label="Toque a marca luminosa">
         <span className="absolute inset-1 rounded-full border border-white/75" /><span className="h-2 w-2 rounded-full bg-white shadow-[0_0_14px_#fff]" /><span className="absolute -bottom-2 left-1 right-1 h-1 overflow-hidden rounded bg-black/60"><span className="block h-full origin-left bg-rose-200" style={{ animation: `dreamCueDrain ${cue.duration}ms linear forwards` }} /></span>
@@ -600,13 +633,17 @@ export const DreamBabylonScene: React.FC<Props> = ({ onComplete, initialPhase = 
         {bossAttackStage === 'warning' ? bossPattern?.phase === 0 ? 'A linha mostra a investida e o ricochete. Saia de todo o percurso.' : bossPattern?.phase === 1 ? 'Ondas no chão: afaste-se dos círculos antes dos espinhos.' : bossPattern?.phase === 2 ? 'A fumaça cruza enquanto os espinhos cercam a arena.' : bossPattern?.phase === 3 ? 'Três cruzamentos em sequência: continue se movendo.' : 'A caçada final combina todos os golpes. Não pare.' : bossAttackStage === 'impact' ? 'DESVIE — o golpe está atravessando a arena.' : 'A fumaça se desfaz e o próximo golpe se forma.'}
       </div>}
       {phase === 'boss' && bossAttackStage === 'recovery' && damageNotice && <div className="absolute left-1/2 top-40 -translate-x-1/2 rounded border border-rose-300/35 bg-rose-950/75 px-4 py-2 font-serif-jp text-[10px] tracking-[.15em] text-rose-100">{damageNotice}</div>}
-      <div className="absolute bottom-5 left-5 flex items-center gap-3 rounded border border-white/10 bg-black/55 px-4 py-3 font-serif-jp text-[10px] tracking-[.2em] backdrop-blur-sm">
+      <div className="absolute bottom-28 left-4 flex items-center gap-3 rounded border border-white/10 bg-black/55 px-3 py-2 font-serif-jp text-[9px] tracking-[.12em] backdrop-blur-sm sm:bottom-5 sm:left-5 sm:px-4 sm:py-3 sm:text-[10px] sm:tracking-[.2em]">
         <span>{phase === 'boss' ? `DESVIOS ${bossHits}/${bossStep}` : `MARCAS ${hits}/${TOTAL_CUES}`}</span><span className="h-4 w-px bg-white/20" /><span className="text-rose-200">SANIDADE {sanity}%</span>
       </div>
-      <div className="absolute bottom-5 right-5 flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-2 font-mono text-[10px] pointer-events-auto backdrop-blur-sm">
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full border border-white/20 bg-black/60 px-3 py-2 font-mono text-[10px] pointer-events-auto backdrop-blur-sm sm:bottom-5 sm:right-5">
         <button onClick={() => setZoom((value) => clamp(value + 2, 11, 30))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Afastar câmera">−</button><span className="min-w-10 text-center">{(16 / zoom).toFixed(1)}×</span><button onClick={() => setZoom((value) => clamp(value - 2, 11, 30))} className="grid h-7 w-7 place-items-center rounded-full hover:bg-white/15" aria-label="Aproximar câmera">+</button>
       </div>
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/45 px-4 py-2 font-serif-jp text-[9px] tracking-[.2em] text-white/50">WASD / SETAS · CLIQUE PARA ANDAR</div>
+      <div className="hidden absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/45 px-4 py-2 font-serif-jp text-[9px] tracking-[.2em] text-white/50 sm:block">WASD / SETAS · CLIQUE PARA ANDAR</div>
+    </div>}
+    {(phase === 'playing' || phase === 'boss') && <div className="absolute bottom-4 left-4 z-30 flex flex-col items-center gap-1 sm:hidden" aria-label="Controles de movimento">
+      <button style={{ touchAction: 'none' }} className="grid h-12 w-12 place-items-center rounded-full border border-white/25 bg-black/75 text-xl text-white shadow-lg backdrop-blur active:bg-rose-900/80" onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); touchKeysRef.current.w = true; }} onPointerUp={() => { touchKeysRef.current.w = false; }} onPointerCancel={() => { touchKeysRef.current.w = false; }} onLostPointerCapture={() => { touchKeysRef.current.w = false; }} aria-label="Mover para cima">↑</button>
+      <div className="flex gap-1">{([['a','←','Mover para esquerda'],['s','↓','Mover para baixo'],['d','→','Mover para direita']] as const).map(([key, glyph, label]) => <button key={key} style={{ touchAction: 'none' }} className="grid h-12 w-12 place-items-center rounded-full border border-white/25 bg-black/75 text-xl text-white shadow-lg backdrop-blur active:bg-rose-900/80" onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); touchKeysRef.current[key] = true; }} onPointerUp={() => { touchKeysRef.current[key] = false; }} onPointerCancel={() => { touchKeysRef.current[key] = false; }} onLostPointerCapture={() => { touchKeysRef.current[key] = false; }} aria-label={label}>{glyph}</button>)}</div>
     </div>}
     {phase === 'failed' && <div className="absolute inset-0 z-40 grid place-items-center bg-black/95 px-5 text-center"><div className="max-w-lg"><p className="font-serif-jp text-[10px] tracking-[.55em] text-rose-300/70">A MEMÓRIA SE FECHA</p><h2 className="mt-4 font-title text-3xl tracking-[.2em]">TUDO FICA PRETO</h2><p className="mt-4 font-serif-jp text-sm leading-7 text-neutral-400">As sombras alcançaram Gabriela. O sonho recomeça no instante antes da queda.</p><button onClick={retry} className="mt-8 border border-white/30 px-7 py-3 font-serif-jp text-[10px] tracking-[.3em] transition hover:border-rose-200 hover:bg-rose-950/50">TENTAR NOVAMENTE</button></div></div>}
     {phase === 'complete' && <button onClick={onComplete} className="absolute inset-0 z-40 grid place-items-center bg-[#050409]/95 px-5 text-center" aria-label="Acordar e continuar"><span><span className="block font-serif-jp text-[9px] tracking-[.6em] text-violet-200/65">A FUMAÇA SE DESFAZ</span><span className="mt-5 block font-title text-4xl tracking-[.25em]">GABRIELA ACORDA</span><span className="mt-5 block font-serif-jp text-sm leading-7 text-neutral-400">A luz cinzenta da manhã toca o quarto. O sonho fica para trás — mas a sensação não.</span><span className="mt-8 block font-serif-jp text-[9px] tracking-[.35em] text-neutral-500">CLIQUE PARA ABRIR OS OLHOS</span></span></button>}
