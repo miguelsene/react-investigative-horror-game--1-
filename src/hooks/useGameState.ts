@@ -15,7 +15,7 @@ import {
   INITIAL_CONNECTIONS 
 } from '../data/clues';
 
-const SAVE_STORAGE_KEY = 'gabriela_game_save';
+const SAVE_STORAGE_KEY = (slot = 1) => `gabriela_game_save_${slot}`;
 
 export const useGameState = () => {
   const [currentChapter, setCurrentChapter] = useState<number>(1);
@@ -54,11 +54,12 @@ export const useGameState = () => {
   ]);
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [activeSaveSlot, setActiveSaveSlot] = useState(1);
 
   // Load game from LocalStorage
-  const loadGame = useCallback((): boolean => {
+  const loadGame = useCallback((slot = 1): boolean => {
     try {
-      const raw = localStorage.getItem(SAVE_STORAGE_KEY);
+      const raw = localStorage.getItem(SAVE_STORAGE_KEY(slot)) || (slot === 1 ? localStorage.getItem('gabriela_game_save') : null);
       if (!raw) return false;
 
       const data: GameSaveData = JSON.parse(raw);
@@ -91,7 +92,7 @@ export const useGameState = () => {
   }, []);
 
   // Save game to LocalStorage with non-blocking toast
-  const saveGame = useCallback(() => {
+  const saveGame = useCallback((slot = activeSaveSlot) => {
     // Developer sessions are intentionally sandboxed and never overwrite the
     // player's campaign slot.
     if (storyFlags.developer_mode) {
@@ -121,7 +122,7 @@ export const useGameState = () => {
         notes,
       };
 
-      localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(saveData));
+      localStorage.setItem(SAVE_STORAGE_KEY(slot), JSON.stringify(saveData));
       setTimeout(() => {
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2500);
@@ -130,7 +131,7 @@ export const useGameState = () => {
       console.error('Error saving game:', e);
       setSaveStatus('idle');
     }
-  }, [
+  }, [activeSaveSlot,
     currentChapter,
     unlockedChapters,
     currentTime,
@@ -147,8 +148,8 @@ export const useGameState = () => {
   ]);
 
   // Delete save game
-  const deleteSave = useCallback(() => {
-    localStorage.removeItem(SAVE_STORAGE_KEY);
+  const deleteSave = useCallback((slot = 1) => {
+    localStorage.removeItem(SAVE_STORAGE_KEY(slot));
     // Reset to defaults
     setCurrentChapter(1);
     setUnlockedChapters([1]);
@@ -249,7 +250,39 @@ export const useGameState = () => {
   }, []);
 
   const addNote = useCallback((noteText: string) => {
-    setNotes((prev) => [noteText, ...prev]);
+    setNotes((prev) => prev.includes(noteText) ? prev : [noteText, ...prev]);
+  }, []);
+
+  const recordInvestigation = useCallback((entry: {
+    id: string;
+    title: string;
+    category: Clue['category'];
+    summary: string;
+    note?: string;
+    time?: string;
+  }) => {
+    const clueId = `clue_${entry.id}`;
+    const nodeId = `node_${entry.id}`;
+    setClues((prev) => prev.some((clue) => clue.id === clueId) ? prev : [...prev, {
+      id: clueId,
+      title: entry.title,
+      category: entry.category,
+      basicInfo: entry.summary,
+      revealedTiers: 1,
+      timeAssociated: entry.time,
+    }]);
+    setEvidenceNodes((prev) => prev.some((node) => node.id === nodeId) ? prev : [...prev, {
+      id: nodeId,
+      title: entry.title,
+      category: entry.category,
+      x: 150 + (prev.length % 4) * 235,
+      y: 510 + Math.floor((prev.length - INITIAL_EVIDENCE_NODES.length) / 4) * 155,
+      summary: entry.summary,
+      time: entry.time,
+      isUnlocked: true,
+    }]);
+    const note = entry.note ?? `${entry.category === 'people' ? 'Pessoa' : entry.category === 'location' ? 'Local visitado' : 'Descoberta'}: ${entry.title}. ${entry.summary}`;
+    setNotes((prev) => prev.includes(note) ? prev : [note, ...prev]);
   }, []);
 
   const connectEvidenceNodes = useCallback((fromId: string, toId: string) => {
@@ -277,8 +310,9 @@ export const useGameState = () => {
     setEvidenceNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, x, y } : n)));
   }, []);
 
-  const checkHasSave = useCallback((): boolean => {
-    return !!localStorage.getItem(SAVE_STORAGE_KEY);
+  const checkHasSave = useCallback((slot?: number): boolean => {
+    if (slot) return !!(localStorage.getItem(SAVE_STORAGE_KEY(slot)) || (slot === 1 && localStorage.getItem('gabriela_game_save')));
+    return [1, 2, 3, 4].some((index) => !!localStorage.getItem(SAVE_STORAGE_KEY(index)) || (index === 1 && !!localStorage.getItem('gabriela_game_save')));
   }, []);
 
   /**
@@ -320,11 +354,13 @@ export const useGameState = () => {
     inspectedObjects,
     notes,
     saveStatus,
+    setActiveSaveSlot,
     saveGame,
     loadGame,
     deleteSave,
     unlockClue,
     addNote,
+    recordInvestigation,
     connectEvidenceNodes,
     removeEvidenceConnection,
     moveEvidenceNode,

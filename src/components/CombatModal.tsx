@@ -47,6 +47,8 @@ export const CombatModal: React.FC<CombatModalProps> = ({
   ]);
   const [isPlayerTurn, setIsPlayerTurn] = useState<boolean>(true);
   const [isDefending, setIsDefending] = useState<boolean>(false);
+  const [bossTurn, setBossTurn] = useState(0);
+  const [bossAttack, setBossAttack] = useState('A sombra se alonga pelo corredor.');
 
   const addLog = (text: string) => {
     setCombatLog((prev) => [text, ...prev.slice(0, 5)]);
@@ -143,9 +145,18 @@ export const CombatModal: React.FC<CombatModalProps> = ({
 
   const enemyTurn = () => {
     soundManager.playHeartbeat();
-    const rawDamage = 18;
-    const actualDamage = isDefending ? Math.floor(rawDamage * 0.4) : rawDamage;
-    const focusDrain = isDefending ? 5 : 12;
+    const nextTurn = bossTurn + 1;
+    setBossTurn(nextTurn);
+    const attacks = [
+      { name: 'Golpe de braços alongados', damage: 15, focus: 9, text: 'Braços negros atravessam o chão em um golpe largo.' },
+      { name: 'Pulso de distorção', damage: 10, focus: 17, text: 'Um pulso escuro distorce a visão e drena o foco.' },
+      { name: 'Investida da sombra', damage: 23, focus: 6, text: 'A Sombra se comprime e investe contra Gabriela.' },
+      { name: 'Chuva de estilhaços', damage: 13, focus: 13, text: 'Fragmentos da silhueta caem do teto como lâminas.' },
+    ];
+    const attack = attacks[(nextTurn - 1) % attacks.length];
+    setBossAttack(attack.text);
+    const actualDamage = isDefending ? Math.ceil(attack.damage * 0.4) : attack.damage;
+    const focusDrain = isDefending ? Math.ceil(attack.focus * 0.4) : attack.focus;
 
     const newHp = Math.max(0, playerStats.health - actualDamage);
     const newFocus = Math.max(0, playerStats.focus - focusDrain);
@@ -155,7 +166,7 @@ export const CombatModal: React.FC<CombatModalProps> = ({
       focus: newFocus,
     });
 
-    addLog(`A anomalia distorce o espaço, causando ${actualDamage} de impacto e ${focusDrain} de tensão.`);
+    addLog(`${attack.text} Gabriela sofre ${actualDamage} de impacto e ${focusDrain} de tensão.`);
     setIsDefending(false);
     setIsPlayerTurn(true);
 
@@ -184,7 +195,12 @@ export const CombatModal: React.FC<CombatModalProps> = ({
         </div>
 
         {/* Battlefield Visual Presentation */}
-        <div className="relative p-6 bg-gradient-to-b from-[#151922] to-[#0c0e12] flex flex-col md:flex-row items-center justify-between gap-6 border-b border-neutral-800 min-h-[220px]">
+        <div className="relative p-6 bg-gradient-to-b from-[#151922] to-[#0c0e12] flex flex-col md:flex-row items-center justify-between gap-6 border-b border-neutral-800 min-h-[300px] overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+            <div className="absolute bottom-0 left-[43%] h-48 w-36 -translate-x-1/2 animate-pulse bg-gradient-to-t from-black via-[#090a10] to-transparent [clip-path:polygon(38%_0,62%_0,71%_18%,82%_25%,100%_52%,79%_47%,96%_100%,55%_82%,48%_100%,38%_81%,4%_100%,23%_49%,0_53%,19%_25%,30%_17%)] drop-shadow-[0_0_24px_rgba(122,16,36,.8)]" />
+            <div className="absolute bottom-8 left-[43%] h-28 w-48 -translate-x-1/2 rounded-full bg-red-950/30 blur-xl" />
+            <span className="absolute bottom-4 left-[43%] -translate-x-1/2 font-mono text-[9px] tracking-[.3em] text-red-300/60">{bossAttack}</span>
+          </div>
           
           {/* Gabriela's Status Card */}
           <div className="w-full md:w-5/12 bg-black/40 border border-neutral-800 p-4 rounded-lg space-y-3">

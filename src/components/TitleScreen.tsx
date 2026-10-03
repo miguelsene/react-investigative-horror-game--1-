@@ -5,8 +5,8 @@ interface TitleScreenProps {
   hasSavedGame: boolean;
   loadProgress: number;
   ready: boolean;
-  onContinue: () => void;
-  onNewGame: () => void;
+  onContinue: (slot: number) => void;
+  onNewGame: (slot: number) => void;
   onOpenChapters: () => void;
   onOpenSettings: () => void;
   onExtra: () => void;
@@ -31,6 +31,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   const [selected, setSelected] = useState<number>(hasSavedGame ? 0 : 1);
   const [subliminal, setSubliminal] = useState(false);
   const [confirmNew, setConfirmNew] = useState(false);
+  const [slotPicker, setSlotPicker] = useState<'new' | 'continue' | null>(null);
 
   /* ---- Fog + film grain canvas (Silent Hill-style attract) ---- */
   useEffect(() => {
@@ -138,12 +139,8 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
       if (!it || it.disabled) return;
       soundManager.playMenuSelect();
       if (it.id === 'new') {
-        if (hasSavedGame && !confirmNew) {
-          setConfirmNew(true);
-          return;
-        }
-        onNewGame();
-      } else if (it.id === 'continue') onContinue();
+        setSlotPicker('new');
+      } else if (it.id === 'continue') setSlotPicker('continue');
       else if (it.id === 'chapters') onOpenChapters();
       else if (it.id === 'options') onOpenSettings();
       else if (it.id === 'extra') onExtra();
@@ -165,7 +162,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         if (k === 'enter') {
           setConfirmNew(false);
           soundManager.playMenuSelect();
-          onNewGame();
+          setSlotPicker('new');
         } else if (k === 'escape') setConfirmNew(false);
         return;
       }
@@ -197,10 +194,10 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         src="/images/menu_bg.jpg"
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ opacity: 0.32, filter: 'grayscale(0.55) blur(1.5px) brightness(0.6) contrast(1.1)' }}
+        style={{ opacity: 0.9, filter: 'saturate(.72) brightness(.74) contrast(1.12)' }}
         draggable={false}
       />
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ mixBlendMode: 'screen', opacity: 0.95 }} />
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ mixBlendMode: 'screen', opacity: 0.32 }} />
       <div className="vignette" aria-hidden="true" />
 
       {subliminal && (
@@ -210,14 +207,14 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
       )}
 
       {/* Title */}
-      <div className="title-screen-heading absolute inset-x-0 top-[12%] sm:top-[14%] flex flex-col items-center text-center z-20 pointer-events-none px-4">
+      <div className="title-screen-heading absolute left-[7%] right-auto top-[9%] sm:top-[7%] flex w-[min(36rem,82vw)] flex-col items-start text-left z-20 pointer-events-none px-0">
         <span className="font-serif-jp text-[11px] tracking-[0.55em] text-neutral-400 uppercase fade-up">京都 · 未解決</span>
-        <h1 className="title-in title-glow title-screen-name font-title font-black text-[11vw] sm:text-[6.5rem] leading-[0.95] text-[#e8e4dc] mt-3 tracking-[0.08em]">
+        <h1 className="title-in title-glow title-screen-name font-title font-black text-[clamp(2.5rem,8vw,5.7rem)] leading-[0.95] text-[#e8e4dc] mt-3 tracking-[0.04em]">
           Quem é você?
         </h1>
         <div className="mt-5 h-px w-44 bg-gradient-to-r from-transparent via-red-700/90 to-transparent" />
         {/* Ordem Paranormal brand mark */}
-        <div className="title-brand mt-5 fade-up" style={{ animationDelay: '0.8s' }}>
+        <div className="title-brand mt-5 hidden" style={{ animationDelay: '0.8s' }}>
             <img
               src="/images/op_logo.png"
               alt="Op Logo"
@@ -233,7 +230,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
       {/* Attract / Loading */}
       {phase === 'attract' && (
-        <div className="absolute inset-x-0 bottom-[22%] flex flex-col items-center z-20 pointer-events-none">
+        <div className="absolute left-[7%] right-auto bottom-[12%] flex flex-col items-start z-20 pointer-events-none">
           {!ready ? (
             <div className="flex flex-col items-center gap-3">
               <span className="font-serif-jp text-xs tracking-[0.4em] text-neutral-500 uppercase">Carregando arquivos do caso</span>
@@ -247,9 +244,15 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </div>
       )}
 
+      {slotPicker && <div className="fixed inset-0 z-[60] grid place-items-center bg-black/80 p-5 backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
+        <section className="w-full max-w-3xl border border-white/20 bg-[#0a0b10]/95 p-6 sm:p-9 text-[#eee8dc] shadow-2xl">
+          <div className="mb-6 flex items-center justify-between"><div><p className="font-serif-jp text-[10px] tracking-[.4em] text-rose-200/70">ARQUIVO PESSOAL</p><h2 className="mt-2 font-title text-2xl tracking-[.15em]">{slotPicker === 'new' ? 'ESCOLHA UM ESPAÇO' : 'RETOMAR INVESTIGAÇÃO'}</h2></div><button onClick={() => setSlotPicker(null)} className="text-neutral-400 hover:text-white">FECHAR ×</button></div>
+          <div className="grid gap-3 sm:grid-cols-2">{[1,2,3,4].map(slot => { const exists = !!localStorage.getItem(`gabriela_game_save_${slot}`) || (slot === 1 && !!localStorage.getItem('gabriela_game_save')); return <button key={slot} disabled={slotPicker === 'continue' && !exists} onClick={() => { const mode = slotPicker; setSlotPicker(null); if (mode === 'new') onNewGame(slot); else onContinue(slot); }} className="min-h-28 border border-white/15 bg-white/[.035] p-4 text-left transition hover:border-rose-200/60 hover:bg-rose-950/20 disabled:opacity-30"><span className="font-title text-lg tracking-[.18em]">SLOT 0{slot}</span><span className="mt-2 block font-serif-jp text-xs text-neutral-400">{exists ? 'Caso salvo · continuar de onde parou' : 'Novo arquivo · vazio'}</span></button>})}</div>
+        </section>
+      </div>}
       {/* Menu */}
       {phase === 'menu' && (
-        <div className="absolute inset-x-0 bottom-[12%] flex flex-col items-center z-20 fade-up">
+        <div className="absolute left-[7%] right-auto top-[43%] sm:top-[38%] bottom-auto flex max-h-[48vh] flex-col items-start overflow-y-auto z-20 fade-up">
           {confirmNew ? (
             <div className="flex flex-col items-center gap-4 text-center">
               <span className="font-serif-jp text-sm tracking-[0.25em] text-neutral-200">Apagar o progresso atual e recomeçar?</span>
@@ -260,7 +263,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                     e.stopPropagation();
                     setConfirmNew(false);
                     soundManager.playMenuSelect();
-                    onNewGame();
+                    setSlotPicker('new');
                   }}
                 >
                   SIM <span className="text-neutral-600 text-[10px]">[ENTER]</span>
@@ -277,7 +280,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               </div>
             </div>
           ) : (
-            <ul className="flex flex-col items-center gap-3">
+            <ul className="flex flex-col items-start gap-1 sm:gap-2.5">
               {items.map((it, idx) => {
                 const active = idx === selected;
                 return (
@@ -294,7 +297,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                         e.stopPropagation();
                         run(idx);
                       }}
-                      className={`font-title text-sm sm:text-base tracking-[0.42em] uppercase transition-all duration-200 px-6 py-1 ${
+                      className={`font-title text-xs sm:text-base tracking-[0.2em] sm:tracking-[0.28em] uppercase transition-all duration-200 pl-6 pr-3 py-1 ${
                         it.disabled ? 'text-neutral-700 cursor-not-allowed' : active ? 'text-red-200 title-glow scale-105' : 'text-neutral-400 hover:text-neutral-200'
                       }`}
                     >
@@ -302,7 +305,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
                       {it.label}
                     </button>
                     {active && !it.disabled && (
-                      <div className="absolute -bottom-3 inset-x-0 text-center font-serif-jp text-[10px] tracking-[0.3em] text-neutral-500 uppercase whitespace-nowrap">{it.sub}</div>
+                      <div className="hidden sm:block absolute left-full top-1/2 ml-5 -translate-y-1/2 font-serif-jp text-[9px] tracking-[0.2em] text-neutral-400/70 uppercase whitespace-nowrap">{it.sub}</div>
                     )}
                   </li>
                 );
@@ -312,9 +315,11 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </div>
       )}
 
-      <div className="absolute bottom-4 inset-x-6 flex items-center justify-between font-serif-jp text-[10px] tracking-[0.3em] text-neutral-600 uppercase z-20 pointer-events-none">
+      <div className="absolute bottom-[8%] left-[5.4%] flex flex-col gap-2 font-serif-jp text-[10px] tracking-[0.3em] text-neutral-300/55 uppercase z-20 pointer-events-none">
         <span>Caso 74-0317 · Arquivos de Kyoto</span>
-        <span>Fones de ouvido recomendados</span>
+        <span className="text-base tracking-[0.4em]">03:17</span>
+        <span className="text-[8px] tracking-[0.2em]">— Algumas coisas</span>
+        <span className="pl-8 text-[8px] tracking-[0.2em]">não deveriam ser lembradas.</span>
       </div>
     </div>
   );

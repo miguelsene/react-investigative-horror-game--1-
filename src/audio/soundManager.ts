@@ -397,6 +397,64 @@ class SoundManager {
   private musicSource: AudioBufferSourceNode | null = null;
   private musicFadeGain: GainNode | null = null;
   private musicLoadId = 0;
+  private musicOverlaySource: AudioBufferSourceNode | null = null;
+  private musicOverlayGain: GainNode | null = null;
+  private musicOverlayLoadId = 0;
+  private musicOverlayUrl: string | null = null;
+
+  /** Plays a second looping music layer through the shared music bus. */
+  public setMusicOverlayFile(url: string, volume = 0.42) {
+    if (!this.ctx || !this.musicGain || this.musicOverlayUrl === url) return;
+    this.stopMusicOverlay(250);
+    const loadId = ++this.musicOverlayLoadId;
+    this.musicOverlayUrl = url;
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error('Network response was not ok');
+        return response.arrayBuffer();
+      })
+      .then((data) => this.ctx?.decodeAudioData(data))
+      .then((buffer) => {
+        if (!buffer || loadId !== this.musicOverlayLoadId || !this.ctx || !this.musicGain) return;
+        const source = this.ctx.createBufferSource();
+        const gain = this.ctx.createGain();
+        source.buffer = buffer;
+        source.loop = true;
+        gain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+        source.connect(gain);
+        gain.connect(this.musicGain);
+        source.start();
+        gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, Math.min(1, volume)), this.ctx.currentTime + 0.8);
+        this.musicOverlaySource = source;
+        this.musicOverlayGain = gain;
+      })
+      .catch((error) => {
+        if (loadId === this.musicOverlayLoadId) {
+          this.musicOverlayUrl = null;
+          console.warn('Failed to load layered music file:', url, error);
+        }
+      });
+  }
+
+  public stopMusicOverlay(duration = 350) {
+    this.musicOverlayLoadId++;
+    this.musicOverlayUrl = null;
+    const source = this.musicOverlaySource;
+    const gain = this.musicOverlayGain;
+    const ctx = this.ctx;
+    this.musicOverlaySource = null;
+    this.musicOverlayGain = null;
+    if (!source || !gain || !ctx) return;
+    const fadeSeconds = Math.max(0.015, duration / 1000);
+    const stopAt = ctx.currentTime + fadeSeconds;
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+    try { source.stop(stopAt + 0.02); } catch {}
+    window.setTimeout(() => {
+      try { source.disconnect(); gain.disconnect(); } catch {}
+    }, duration + 100);
+  }
 
   public setMusicFile(url: string) {
     if (!this.ctx || !this.musicGain) return;

@@ -515,7 +515,9 @@ const shelfLoader = new GLTFLoader();
       pivot.add(leaf);
       root.add(pivot);
       const collider = { x: centerX, z, w: doorW, d: 0.22, enabled: true };
-      const door: SchoolDoor = { id: `door_${roomId}`, x: centerX, z, isOpen: false };
+      const door: SchoolDoor = { id: `door_${roomId}`, x: centerX, z, isOpen: true };
+      pivot.rotation.y = -Math.PI / 2;
+      collider.enabled = false;
       colliders.push(collider);
       doors.push(door);
       doorParts.push({ door, pivot, collider });
@@ -1301,8 +1303,9 @@ const shelfLoader = new GLTFLoader();
     // Connected east wing: cafeteria, kitchen and supply room.
     put(Mo.woodFloor(16, 24), 35, 0, -6);
     put(Mo.box(16, 0.1, 24, Mo.std(0x666666)), 35, -0.05, -6);
-    addFrontPartition(35, 16, -5.6, 'annex_kitchen', 1.6, 3.2);
-    addFrontPartition(35, 16, -11.8, 'annex_storage', 1.6, 3.2);
+    // Keep broad, clear openings between cafeteria, kitchen and storage.
+    addFrontPartition(35, 16, -5.6, 'annex_kitchen', 3.2, 3.2);
+    addFrontPartition(35, 16, -11.8, 'annex_storage', 3.2, 3.2);
     ceilingPanel(35, -2.8, 16, 6.2);
     ceilingPanel(35, -8.8, 16, 6.2);
     ceilingPanel(35, -14.9, 16, 6.2);
@@ -1404,6 +1407,24 @@ const shelfLoader = new GLTFLoader();
       { id: 'walk_haru', name: 'Haru', role: 'Estudante', x: 23, z: 1.2, lines: ['Bom dia, Gabriela.'] },
     );
 
+    // Staff sprites are added before creating the sprite/collider list so they
+    // remain visible and interactable in their rooms.
+    npcs.push(
+      { id: 'nurse_reiko', name: 'Reiko Arai', role: 'Enfermeira', x: 5, z: -12, lines: ['Está tudo bem, Gabriela? Você parece pálida.'], dialogueNodeId: 'nurse_reiko' },
+      { id: 'secretary_mei', name: 'Mei Chen', role: 'Secretária', x: -13, z: -12, lines: ['A diretora está esperando você terminar o exame de rotina.'], dialogueNodeId: 'secretary_mei' },
+      { id: 'director_akiyama', name: 'Diretora Akiyama', role: 'Diretora', x: -12, z: -9, lines: ['Gabriela, posso conversar com você um instante?'], dialogueNodeId: 'director_akiyama' },
+    );
+
+    npcs.push(
+      { id: 'chat_mio', name: 'Mio Kurosawa', role: 'Amiga', x: -5, z: -9, lines: ['Ei, Gabriela! Vi que você gosta de livros.'], dialogueNodeId: 'chat_mio' },
+      { id: 'chat_aya', name: 'Aya Minamoto', role: 'Estudante', x: 10.5, z: -15.5, lines: ['Você pode me ajudar com este problema de matemática?'], dialogueNodeId: 'chat_aya' },
+      { id: 'chat_ren', name: 'Ren Watanabe', role: 'Estudante', x: 15.8, z: -14.2, lines: ['A professora vai chegar em breve.'], dialogueNodeId: 'chat_ren' },
+      { id: 'chat_sora', name: 'Sora Yamamoto', role: 'Fotografia', x: -21, z: -14.8, lines: ['Viu minhas fotos do festival ontem?'], dialogueNodeId: 'chat_sora' },
+      { id: 'chat_nana', name: 'Nana Suzuki', role: 'Estudante', x: 20, z: -10.5, lines: ['Você viu o novo episódio do anime?'], dialogueNodeId: 'chat_nana' },
+      { id: 'chat_hana', name: 'Hana Yoshida', role: 'Artista', x: 14.2, z: -13.8, lines: ['Estou trabalhando em uma nova pintura.'], dialogueNodeId: 'chat_hana' },
+      { id: 'computer_teacher', name: 'Prof. Tanaka', role: 'Professor', x: -20.5, z: -11, lines: ['Os computadores estão atualizados hoje.'], dialogueNodeId: 'computer_teacher' },
+      { id: 'courtyard_keeper', name: 'Velho Kashimoto', role: 'Guardião', x: -4.5, z: 3.5, lines: ['Que bom ver jovens visitando o santuário.'], dialogueNodeId: 'courtyard_keeper' },
+    );
     npcs.forEach((npc, idx) => {
       const sprite = createSilhouette(false, 1.58);
       sprite.position.set(npc.x, 0, npc.z);
@@ -1434,17 +1455,6 @@ const shelfLoader = new GLTFLoader();
       { id: 'chat_hana', name: 'Hana Yoshida', role: 'Artista', x: 14.2, z: -13.8, lines: ['Estou trabalhando em uma nova pintura.'], dialogueNodeId: 'chat_hana' }
     );
 
-    // Nurse NPC in infirmary
-    npcs.push(
-      { id: 'nurse_reiko', name: 'Reiko Arai', role: 'Enfermeira', x: 3.5, z: -14.5, lines: ['Está tudo bem, Gabriela? Você parece pálida.'], dialogueNodeId: 'nurse_reiko' }
-    );
-
-    // Secretary NPC
-    npcs.push(
-      { id: 'secretary_mei', name: 'Mei Chen', role: 'Secretária', x: -13.5, z: -15.5, lines: ['Formulários de inscrição estão na mesa.'], dialogueNodeId: 'secretary_mei' },
-      { id: 'director_akiyama', name: 'Diretora Akiyama', role: 'Diretora', x: -10.5, z: -15.5, lines: ['Gabriela, posso conversar com você um instante?'], dialogueNodeId: 'director_akiyama' }
-    );
-
     // Computer room teacher
     npcs.push(
       { id: 'computer_teacher', name: 'Prof. Tanaka', role: 'Professor de Informática', x: -20.5, z: -14.5, lines: ['Os computadores estão atualizados hoje.'], dialogueNodeId: 'computer_teacher' }
@@ -1454,6 +1464,13 @@ const shelfLoader = new GLTFLoader();
     npcs.push(
       { id: 'courtyard_keeper', name: 'Velho Kashimoto', role: 'Guardião do Santuário', x: -4.5, z: 3.5, lines: ['Que bom ver jovens visitando o santuário.'], dialogueNodeId: 'courtyard_keeper' }
     );
+
+    // Keep the pre-rendered entries so prompts match visible sprites.
+    const registeredNpcIds = new Set<string>();
+    for (let i = 0; i < npcs.length;) {
+      if (registeredNpcIds.has(npcs[i].id)) npcs.splice(i, 1);
+      else { registeredNpcIds.add(npcs[i].id); i++; }
+    }
 
     // Fade just the first wall between the camera and Gabriela, then clamp the camera to its near side.
     const updateCameraOcclusion = (camera: THREE.Camera, player: THREE.Vector3, _dt = 1 / 60) => {

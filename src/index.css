@@ -193,10 +193,10 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 .title-in { animation: titleIn 3.4s ease-out both; letter-spacing: .28em; }
 @keyframes blinkSlow { 0%,100% { opacity: 1 } 50% { opacity: .12 } }
 .blink-slow { animation: blinkSlow 2.2s ease-in-out infinite; }
-.title-screen::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1; background: radial-gradient(ellipse at 50% 40%, transparent 0 25%, rgba(5,3,4,.28) 55%, rgba(0,0,0,.88) 100%), linear-gradient(90deg, rgba(80,8,14,.25), transparent 30%, transparent 70%, rgba(80,8,14,.2)); }
-.title-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: .36; background-image: radial-gradient(circle at 14% 18%, #b22c39 0 2px, transparent 3px), radial-gradient(circle at 88% 19%, #7e222f 0 3px, transparent 4px), radial-gradient(circle at 78% 83%, #a23e42 0 2px, transparent 3px); background-size: 180px 150px, 230px 180px, 160px 130px; filter: blur(2px); animation: petalsDrift 14s linear infinite; }
+.title-screen::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 1; background: linear-gradient(90deg, rgba(0,0,0,.96) 0%, rgba(0,0,0,.88) 18%, rgba(0,0,0,.58) 34%, rgba(0,0,0,.12) 61%, rgba(0,0,0,.12) 100%), linear-gradient(0deg, rgba(0,0,0,.55), transparent 26%, transparent 78%, rgba(0,0,0,.18)); }
+.title-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: .12; background-image: radial-gradient(circle at 14% 18%, #b22c39 0 2px, transparent 3px), radial-gradient(circle at 88% 19%, #7e222f 0 3px, transparent 4px); background-size: 260px 220px, 330px 280px; filter: blur(2px); animation: petalsDrift 14s linear infinite; }
 .title-screen-name { font-family: Georgia, 'Times New Roman', serif; font-weight: 700; text-transform: uppercase; text-shadow: 0 0 3px #f5ecdc, 2px 0 rgba(168,30,32,.42), -2px 0 rgba(31,86,88,.34), 0 5px 24px rgba(0,0,0,.95); filter: contrast(1.15); }
-.title-screen-heading { transform: scale(.86); transform-origin: top center; }
+.title-screen-heading { transform: none; transform-origin: top left; }
 .title-brand img { width: min(280px, 52vw) !important; height: auto !important; opacity: .82 !important; filter: grayscale(1) sepia(.18) contrast(.82); }
 @keyframes petalsDrift { from { transform: translateY(-18px) } to { transform: translateY(28px) } }
 .game-boot-loader { position: fixed; inset: 0; z-index: 10001; display: grid; place-items: center; background: #000; animation: areaLoad .2s ease both; }
@@ -213,6 +213,7 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 @keyframes dreamWarp { 0%,100% { opacity: .5; transform: scale(1) rotate(0deg); filter: hue-rotate(0deg) blur(1px) } 50% { opacity: .9; transform: scale(1.08) rotate(1.5deg); filter: hue-rotate(24deg) blur(3px) } }
 @keyframes dreamCueDrain { from { transform: scaleX(1) } to { transform: scaleX(0) } }
 .dream-warp-layer { opacity: .65; mix-blend-mode: screen; animation: dreamWarp 6s ease-in-out infinite; }
+@keyframes nightmareVignette { from { opacity: 0 } to { opacity: 1 } }
 .minigame-pixel-panel { padding: 1.25rem; border: 1px solid rgba(196,160,112,.3); background: linear-gradient(145deg, rgba(14,13,16,.97), rgba(24,19,19,.96)); box-shadow: 0 28px 90px rgba(0,0,0,.72), inset 0 0 36px rgba(105,67,50,.08); }
 .minigame-pixel-panel svg[shape-rendering="crispEdges"] { image-rendering: pixelated; }
 @keyframes loadingScan { 50% { transform: scaleX(.35); opacity: .35 } }

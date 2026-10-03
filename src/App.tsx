@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useGameState } from './hooks/useGameState';
+import { useOS } from './pc-escola/os/store';
 import { soundManager } from './audio/soundManager';
 import { preloadAssets } from './three/assets';
 import { ThreeWorld, WorldHotspot } from './components/ThreeWorld';
@@ -19,6 +20,7 @@ import { ClockChecklist } from './components/ClockChecklist';
 import { HOUSE_CLOCKS } from './data/houseClocks';
 import { NeighborhoodWorld } from './components/NeighborhoodWorld';
 import { SchoolWorld } from './components/SchoolWorld';
+import { SchoolComputer } from './components/SchoolComputer';
 import { DreamBabylonScene } from './components/DreamBabylonScene';
 import { PhoneMap } from './components/PhoneMap';
 import { STREET, RETURN_MONOLOGUES } from './data/streetRoute';
@@ -32,6 +34,7 @@ import { Package, BookMarked, GitFork, Menu, Save, Check, Clock3 } from 'lucide-
 
 export const App: React.FC = () => {
   const gameState = useGameState();
+  const pcLore = useOS((state) => state.lore);
 
   const [activeScreen, setActiveScreen] = useState<'main_menu' | 'gameplay' | 'combat'>('main_menu');
   const [activeInspectionData, setActiveInspectionData] = useState<InspectionObjectData | null>(null);
@@ -40,6 +43,7 @@ export const App: React.FC = () => {
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isChapterSelectOpen, setIsChapterSelectOpen] = useState(false);
+  const [isSchoolPcOpen, setIsSchoolPcOpen] = useState(false);
   const [caseCompletedOpen, setCaseCompletedOpen] = useState(false);
   const [isSecondNightCutscene, setIsSecondNightCutscene] = useState(false);
   const [mapDissolving, setMapDissolving] = useState(false);
@@ -127,6 +131,7 @@ export const App: React.FC = () => {
   /* Gabriela's newest note surfaces as a quiet thought */
   useEffect(() => {
     if (activeScreen !== 'gameplay') return;
+    gameState.saveGame();
     const n = gameState.notes[0];
     if (n && n !== lastNoteRef.current) {
       lastNoteRef.current = n;
@@ -134,6 +139,8 @@ export const App: React.FC = () => {
       const id = setTimeout(() => setThought(null), 6500);
       return () => clearTimeout(id);
     }
+    // Save new notes together with the matching clues and investigation-board nodes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState.notes, activeScreen]);
 
   /* Autosave on floor change */
@@ -166,33 +173,44 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (activeScreen === 'main_menu') {
+      soundManager.stopMusicOverlay(0);
       soundManager.transitionMusicFile('/musicas/trilha_home.mp3');
     } else if (activeScreen === 'gameplay' && worldArea === 'house') {
+      soundManager.stopMusicOverlay();
       soundManager.transitionMusicFile('/musicas/manha.mp3');
     } else if (activeScreen === 'gameplay' && (worldArea === 'street' || worldArea === 'return')) {
+      soundManager.stopMusicOverlay();
       soundManager.transitionMusicFile('/musicas/trilha_home.mp3');
     } else if (activeScreen === 'gameplay' && (worldArea === 'school' || worldArea === 'schoolhall')) {
+      soundManager.stopMusicOverlay();
       soundManager.transitionMusicFile('/musicas/escola.mp3');
     } else if (activeScreen === 'gameplay' && worldArea === 'dream') {
-      soundManager.stopMusic();
+      soundManager.transitionMusicFile('/musicas/sonho.mp3');
     } else {
+      soundManager.stopMusicOverlay(0);
       soundManager.stopMusic();
     }
   }, [activeScreen, worldArea]);
 
   useEffect(() => {
     if (activeScreen !== 'gameplay') return;
+    if (gameState.storyFlags.developer_mode) { setIsAreaLoading(false); return; }
     setIsAreaLoading(true);
     const timer = window.setTimeout(() => setIsAreaLoading(false), 420);
     return () => window.clearTimeout(timer);
-  }, [activeScreen, worldArea]);
+  }, [activeScreen, worldArea, gameState.storyFlags.developer_mode]);
 
   // Switch to the house theme after leaving the title screen.
   const enterHouseArea = useCallback(() => {
     soundManager.setMusicFile('/musicas/manha.mp3');
   }, []);
 
-  const enterGameplay = useCallback(() => {
+  const enterGameplay = useCallback((skipLoading = false) => {
+    if (skipLoading) {
+      setActiveScreen('gameplay'); setShowHint(true); setIsStartingGame(false);
+      setTimeout(() => setShowHint(false), 14000);
+      return;
+    }
     setIsStartingGame(true);
     const loadingDuration = 4000 + Math.round(Math.random() * 4000);
     window.setTimeout(() => {
@@ -226,7 +244,7 @@ export const App: React.FC = () => {
       seven_clocks: true,
       developer_mode: true,
     }));
-    enterGameplay();
+    enterGameplay(true);
     showToast('Modo desenvolvedor: rotina doméstica concluída.');
     // open dev quick-jump panel on entry
     setDevPanelOpen(true);
@@ -345,19 +363,20 @@ export const App: React.FC = () => {
   }, [gameState, showToast]);
 
   const handleStartGame = useCallback(
-    (isNew: boolean) => {
+    (isNew: boolean, slot = 1) => {
       bootAudio();
+      gameState.setActiveSaveSlot(slot);
       if (isNew) {
-        gameState.deleteSave();
+        gameState.deleteSave(slot);
         setWorldArea('house');
         setFoundClocks([]);
         setRepairClockId(null);
         setClockHuntOpen(false);
         lastNoteRef.current = null;
-        enterGameplay();
+        enterGameplay(true);
         setTimeout(() => setActiveDialogueNode(DIALOGUE_NODES['prologue_tick_1']), 900);
       } else {
-        gameState.loadGame();
+        gameState.loadGame(slot);
         enterGameplay();
       }
     },
@@ -382,6 +401,63 @@ export const App: React.FC = () => {
       setWorldArea('street');
     }
   }, [gameState.storyFlags]);
+
+  useEffect(() => {
+    if (activeScreen !== 'gameplay') return;
+    const visit = ({ id, title, summary }: { id: string; title: string; summary: string }) =>
+      gameState.recordInvestigation({ id: `visit_${id}`, title, category: 'location', summary, note: `Local visitado: ${title}. ${summary}` });
+    if (worldArea === 'house') {
+      const upstairs = gameState.currentFloor === 2;
+      visit({ id: upstairs ? 'house_upstairs' : 'house_ground_floor', title: upstairs ? 'Casa — segundo andar' : 'Casa — térreo', summary: upstairs ? 'Quarto de Gabriela, corredor e escritório do avô.' : 'Cozinha, sala, quarto de Chiyo, genkan e jardim.' });
+      const roomNames: Record<string, string> = { bedroom: 'Quarto de Gabriela', upstairs_hall: 'Corredor do segundo andar', study: 'Escritório do avô', living_room: 'Sala da casa', kitchen: 'Cozinha', grandma_room: 'Quarto de Chiyo', garden: 'Jardim', genkan: 'Genkan' };
+      const room = roomNames[gameState.currentLocation];
+      if (room) visit({ id: `room_${gameState.currentLocation}`, title: room, summary: `Cômodo da casa de Chiyo visitado durante a investigação.` });
+    } else {
+      const areas: Record<string, { title: string; summary: string }> = {
+        street: { title: 'Ruas de Sakyo-ku', summary: 'Caminho entre a casa de Chiyo e a Escola Higashi.' },
+        return: { title: 'Caminho de volta para casa', summary: 'Percurso após o fim das aulas, observado por Gabriela.' },
+        school: { title: 'Escola Higashi', summary: 'Salas, secretaria, enfermaria e laboratório onde Gabriela passou o dia.' },
+        schoolhall: { title: 'Corredores da Escola Higashi', summary: 'Corredores, salas e espaços de funcionários da escola.' },
+        dream: { title: 'Espaço branco do sonho', summary: 'Lugar impossível onde as lembranças se desfazem e uma sombra persegue Gabriela.' },
+      };
+      const area = areas[worldArea];
+      if (area) visit({ id: `area_${worldArea}`, ...area });
+      if (worldArea === 'dream') gameState.recordInvestigation({ id: 'dream_shadow', title: 'Sombra de fumaça', category: 'people', summary: 'Uma presença escura atravessa o sonho, ricocheteia pelo espaço branco e ataca Gabriela.', note: 'Presença encontrada no sonho: a sombra se move como fumaça e reage aos movimentos de Gabriela.' });
+    }
+  }, [activeScreen, worldArea, gameState.currentFloor, gameState.currentLocation, gameState.recordInvestigation]);
+
+  useEffect(() => {
+    if (!isSchoolPcOpen) return;
+    const discoveries = [
+      ['pc_yamantaka', pcLore.yamantakaSearched, 'Busca por Yamāntaka', 'A pesquisa no computador liga Yamāntaka às histórias do estranho contato que encontrou Gabriela.'],
+      ['pc_blog', pcLore.sawBlog, 'Blog Midnight Darshana', 'O blog apresenta relatos sobre aparições e a hora 03:17, tratados como folclore na internet.'],
+      ['pc_forum', pcLore.sawForum, 'Fórum e correção dos relatos', 'Uma discussão confronta os relatos do blog e mostra que parte dos registros foi alterada.'],
+      ['pc_archive', pcLore.sawArchive, 'Arquivo escolar — mesa 17', 'O arquivo da escola guarda um registro ligado à mesa 17 e a um padrão que reaparece nas pesquisas.'],
+      ['pc_notebook', pcLore.readNotebook, 'Caderno digital de 1998', 'As anotações encontradas no computador descrevem ocorrências antigas e um método que foi corrigido.'],
+    ] as const;
+    discoveries.forEach(([id, found, title, summary]) => {
+      if (found) gameState.recordInvestigation({ id, title, category: 'evidence', summary, note: `PC Escola — ${title}: ${summary}` });
+    });
+    pcLore.visitedPages.forEach((url, index) => {
+      if (!/midnight-darshana|dharma-forum|memoria\.higashi-school/i.test(url)) return;
+      const title = url.includes('midnight-darshana') ? 'Página Midnight Darshana' : url.includes('dharma-forum') ? 'Fórum Dharma' : 'Arquivo de memória da escola';
+      gameState.recordInvestigation({ id: `pc_page_${url.replace(/[^a-z0-9]+/gi, '_').toLowerCase() || index}`, title, category: 'evidence', summary: `Página consultada no computador da Escola Higashi: ${url}`, note: `Página registrada no PC Escola: ${title} (${url}).` });
+    });
+  }, [isSchoolPcOpen, pcLore, gameState.recordInvestigation]);
+
+  useEffect(() => {
+    if (activeScreen !== 'gameplay' || !activeDialogueNode) return;
+    const person = activeDialogueNode.speakerTitle ?? activeDialogueNode.speaker;
+    const speaker = `${activeDialogueNode.speaker} ${person}`.toLowerCase();
+    if (speaker.includes('pensamento') || speaker.includes('gabriela')) return;
+    const id = activeDialogueNode.id;
+    const known = speaker.includes('chiyo') || speaker.includes('avó') ? { id: 'chiyo', title: 'Chiyo — avó', summary: 'Avó de Gabriela. Afetuosa e observadora; guarda lembranças que ainda não explicou.' }
+      : speaker.includes('diretora') || id.includes('director') ? { id: 'director_akiyama', title: 'Diretora Akiyama', summary: 'Diretora da Escola Higashi. Conversou com Gabriela sobre seu comportamento e sua rotina.' }
+      : speaker.includes('enfermeira') || speaker.includes('médica') || id.includes('nurse') ? { id: 'nurse_reiko', title: 'Enfermeira Reiko', summary: 'Profissional da enfermaria da Escola Higashi. Fez uma avaliação de rotina em Gabriela.' }
+      : speaker.includes('prof') ? { id: 'professor_mori', title: 'Professor Mori', summary: 'Professor da Escola Higashi, responsável pela aula de informática.' }
+      : null;
+    if (known) gameState.recordInvestigation({ ...known, category: 'people', note: `Pessoa encontrada: ${known.title}. ${known.summary}` });
+  }, [activeScreen, activeDialogueNode, gameState.recordInvestigation]);
 
   useEffect(() => {
     if (activeScreen === 'gameplay' && foundClocks.length > 0) gameState.saveGame();
@@ -409,12 +485,12 @@ export const App: React.FC = () => {
         gameState.setStoryFlags((p) => ({ ...p, hallway_painting_anomaly: true }));
       if (nodeId === 'phone_pick_up' || nodeId === 'phone_analyze_sound' || nodeId === 'phone_reaction') {
         gameState.setStoryFlags((p) => ({ ...p, phone_event_triggered: true }));
-        gameState.addNote('O telefone desconectado tocou na madrugada. Horário registrado: 03:17.');
+        gameState.recordInvestigation({ id: 'home_unplugged_phone', title: 'Telefone desconectado — 03:17', category: 'evidence', summary: 'O telefone fixo tocou apesar de estar sem conexão com a rede.', time: '03:17', note: 'Evidência da casa: o telefone desconectado tocou às 03:17.' });
       }
-      if (nodeId === 'look_genkan_shoes') gameState.addNote('As sandálias da avó estão molhadas. Ela saiu durante a madrugada.');
-      if (nodeId === 'look_furin') gameState.addNote('O furin toca sem vento.');
-      if (nodeId === 'look_study_clock') gameState.addNote('Segundo relógio parado: 03:17 no escritório.');
-      if (nodeId === 'look_kimono') gameState.addNote('Lama avermelhada no kimono da avó — solo das encostas do santuário.');
+      if (nodeId === 'look_genkan_shoes') gameState.recordInvestigation({ id: 'home_wet_sandals', title: 'Sandálias molhadas no genkan', category: 'evidence', summary: 'As sandálias de Chiyo ainda estão úmidas, embora ela diga que ficou em casa.' });
+      if (nodeId === 'look_furin') gameState.recordInvestigation({ id: 'home_wind_bell', title: 'Furin toca sem vento', category: 'evidence', summary: 'O sino do jardim toca enquanto o ar está parado.' });
+      if (nodeId === 'look_study_clock') gameState.recordInvestigation({ id: 'home_study_clock', title: 'Relógio do escritório — 03:17', category: 'timeline', summary: 'O relógio do escritório do avô também parou na hora recorrente.', time: '03:17' });
+      if (nodeId === 'look_kimono') gameState.recordInvestigation({ id: 'home_red_mud', title: 'Lama vermelha no quimono', category: 'evidence', summary: 'A lama no quimono de Chiyo parece vir das encostas do santuário.' });
     },
     [gameState]
   );
@@ -589,7 +665,11 @@ export const App: React.FC = () => {
           else setActiveInspectionData(INSPECTABLE_OBJECTS.rotary_phone);
         },
       },
-      { id: 'grandma_chiyo_spot', name: 'Avó Chiyo', type: 'CONVERSAR', position: [2.4, 0.4, -0.55], markerPosition: [2.2, 1.65, -1.15], room: 'kitchen', floor: 1, action: dlg(has('next_morning_anomaly') ? 'anomaly_morning_1' : 'morning_greeting_1') },
+      { id: 'grandma_chiyo_spot', name: 'Avó Chiyo', type: 'CONVERSAR', position: [2.4, 0.4, -0.55], markerPosition: [2.2, 1.65, -1.15], room: 'kitchen', floor: 1, action: () => {
+        if (has('next_morning_anomaly')) return setActiveDialogueNode(DIALOGUE_NODES['anomaly_morning_1']);
+        if (gameState.storyFlags.returned_from_school && !gameState.storyFlags.dinner_done) return setActiveDialogueNode(DIALOGUE_NODES[gameState.storyFlags.activity_cooking ? 'parents_question' : 'home_return']);
+        setActiveDialogueNode(DIALOGUE_NODES['morning_greeting_1']);
+      } },
       {
         id: 'watson_task', name: 'Watson', type: 'EXAMINAR', position: [-3.5, 0.4, 1.55], markerPosition: [-3.5, 0.55, 1.55], room: 'living_room', floor: 1,
         action: () => {
@@ -660,6 +740,10 @@ export const App: React.FC = () => {
             showToast('O jantar já terminou. Suba para o quarto quando estiver pronta.');
             return;
           }
+          if (!gameState.storyFlags.talked_to_grandma_after_school) {
+            showToast('Converse com a avó primeiro. Ela quer saber como foi seu dia.');
+            return;
+          }
           if (gameState.storyFlags.activity_cooking) {
             const wasOpen = gameState.storyFlags.director_trust === 'honest' || gameState.storyFlags.nurse_answer === 'open';
             setActiveDialogueNode(DIALOGUE_NODES[wasOpen ? 'parents_question_open' : 'parents_question_guarded']);
@@ -693,11 +777,12 @@ export const App: React.FC = () => {
     [ateBreakfast, gameState, gameState.storyFlags, homeReady, showToast, talkedMorning, dlg]
   );
 
-      const anyModal = isEvidenceBoardOpen || isJournalOpen || isInventoryOpen || isSettingsOpen || isChapterSelectOpen || !!activeMinigame || clockHuntOpen || !!repairClockId || devPanelOpen;
+      const anyModal = isEvidenceBoardOpen || isJournalOpen || isInventoryOpen || isSettingsOpen || isChapterSelectOpen || isSchoolPcOpen || !!activeMinigame || clockHuntOpen || !!repairClockId || devPanelOpen;
 
   useEffect(() => {
     const handleGlobalKeys = (e: KeyboardEvent) => {
       if (activeScreen !== 'gameplay') return;
+      if (isSchoolPcOpen) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest('input,textarea,select')) return;
       const key = e.key.toLowerCase();
@@ -733,7 +818,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleGlobalKeys);
     return () => window.removeEventListener('keydown', handleGlobalKeys);
-  }, [activeScreen, activeInspectionData, isEvidenceBoardOpen, isJournalOpen, isInventoryOpen, isSettingsOpen, isChapterSelectOpen, activeDialogueNode, devPanelOpen, gameState.storyFlags.developer_mode]);
+  }, [activeScreen, activeInspectionData, isEvidenceBoardOpen, isJournalOpen, isInventoryOpen, isSettingsOpen, isChapterSelectOpen, activeDialogueNode, devPanelOpen, isSchoolPcOpen, gameState.storyFlags.developer_mode]);
 
   const advanceDialogue = (nodeId: string | null) => {
     if (nodeId) {
@@ -760,7 +845,13 @@ export const App: React.FC = () => {
         setClockHuntOpen(true);
       }
       // End of the school day: show the report card, then walk home.
-      if (closingId === 'after_school_grades_4') setWorldArea('school');
+      if (closingId === 'after_school_grades_4') {
+        setWorldArea('return');
+        setRouteProgress(1);
+      }
+      if (['home_response_normal', 'home_response_tired', 'home_response_good', 'home_response_strange', 'home_strange_idk', 'home_strange_reply', 'home_how'].includes(closingId)) {
+        gameState.setStoryFlags((p) => ({ ...p, talked_to_grandma_after_school: true }));
+      }
       if (closingId === 'dinner_eat_2') {
         gameState.setStoryFlags((p) => ({ ...p, dinner_done: true }));
         showToast('Suba para o seu quarto (2º andar) e deite-se para descansar.');
@@ -782,8 +873,8 @@ export const App: React.FC = () => {
           gameState.setStoryFlags((flags) => ({ ...flags, dream_scene_active: true }));
         }, 2400);
       }
-      if (['director_honest', 'director_closed'].includes(closingId)) gameState.setStoryFlags((p) => ({ ...p, school_director_done: true }));
-      if (['nurse_checkup_open', 'nurse_checkup_private'].includes(closingId)) gameState.setStoryFlags((p) => ({ ...p, school_nurse_done: true }));
+      if (['director_honest', 'director_closed', 'director_followup_yes', 'director_followup_no'].includes(closingId)) gameState.setStoryFlags((p) => ({ ...p, school_director_done: true }));
+      if (['nurse_checkup_open', 'nurse_checkup_private', 'nurse_checkup_safe'].includes(closingId)) gameState.setStoryFlags((p) => ({ ...p, school_nurse_done: true }));
       if (closingId === 'computer_lab_mission') gameState.setStoryFlags((p) => ({ ...p, school_computer_done: true }));
       if (closingId === 'chapter_1_close') {
         setIsSecondNightCutscene(false);
@@ -819,8 +910,8 @@ export const App: React.FC = () => {
           hasSavedGame={gameState.checkHasSave()}
           loadProgress={loadProgress}
           ready={assetsReady}
-          onContinue={() => handleStartGame(false)}
-          onNewGame={() => handleStartGame(true)}
+          onContinue={(slot) => handleStartGame(false, slot)}
+          onNewGame={(slot) => handleStartGame(true, slot)}
           onOpenChapters={() => setIsChapterSelectOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onExtra={() => {
@@ -1040,6 +1131,13 @@ export const App: React.FC = () => {
             cameraMotionEnabled={cameraMotionEnabled}
             onTriggerDialogue={(id, label) => {
               const flags = gameState.storyFlags;
+              if (id === 'director_akiyama') gameState.recordInvestigation({ id: 'director_akiyama', title: 'Diretora Akiyama', category: 'people', summary: 'Diretora da Escola Higashi. Conversou com Gabriela sobre seu comportamento e sua rotina.' });
+              if (id === 'nurse_reiko') gameState.recordInvestigation({ id: 'nurse_reiko', title: 'Enfermeira Reiko', category: 'people', summary: 'Profissional da enfermaria da Escola Higashi; avaliou Gabriela durante o exame de rotina.' });
+              if (id === 'computer_lab_main_pc' && !flags.school_nurse_done) return showToast('Conclua o exame na enfermaria antes de usar o computador.');
+              if (id === 'computer_lab_main_pc') {
+                setIsSchoolPcOpen(true);
+                return;
+              }
               if (id === 'art_room_easel' && nextSubject === 'art') {
                 setActiveMinigame('art');
                 return;
@@ -1049,6 +1147,10 @@ export const App: React.FC = () => {
               if (id === 'nurse_reiko' && flags.school_nurse_done) return showToast('O exame de rotina já foi concluído.');
               if (id === 'computer_lab_main_pc' && !flags.school_nurse_done) return showToast('Antes da aula de informática, conclua o exame na enfermaria.');
               if (id === 'computer_lab_main_pc' && flags.school_computer_done) return showToast('O exercício e o registro do erro já foram concluídos.');
+              if (id === 'computer_lab_main_pc') {
+                setIsSchoolPcOpen(true);
+                return;
+              }
               const dialogueId = id === 'nurse_reiko' ? 'nurse_checkup' : id === 'computer_lab_main_pc' ? 'computer_lab_mission' : id;
               const authored = DIALOGUE_NODES[dialogueId];
               setActiveDialogueNode(authored ?? {
@@ -1115,7 +1217,6 @@ export const App: React.FC = () => {
               gameState.setCurrentFloor(1);
               gameState.setCurrentLocation('living_room');
               gameState.setStoryFlags((flags) => ({ ...flags, returned_from_school: true }));
-              setActiveDialogueNode(DIALOGUE_NODES['home_return']);
               showToast('Você voltou para casa.');
               gameState.saveGame();
             }}
@@ -1188,6 +1289,23 @@ export const App: React.FC = () => {
         />
       )}
 
+      {isSchoolPcOpen && (
+        <SchoolComputer
+          completed={!!gameState.storyFlags.school_computer_done}
+          onClose={() => setIsSchoolPcOpen(false)}
+          onExerciseComplete={() => {
+            gameState.setStoryFlags((flags) => ({ ...flags, school_computer_done: true }));
+            gameState.saveGame();
+            showToast('Atividade do PC Escola concluída. Você pode usar o computador novamente quando quiser.');
+          }}
+          onRunExercise={() => {
+            setIsSchoolPcOpen(false);
+            if (!gameState.storyFlags.school_computer_done) setActiveDialogueNode(DIALOGUE_NODES['computer_lab_mission']);
+            else showToast('O registro da atividade e o código 0317 continuam salvos neste terminal.');
+          }}
+        />
+      )}
+
       {activeScreen === 'gameplay' && worldArea === 'dream' && (
         <DreamBabylonScene key={devDreamRun} initialPhase={devDreamPhase} onComplete={() => {
           setWorldArea('house');
@@ -1211,6 +1329,14 @@ export const App: React.FC = () => {
           onClose={() => setActiveInspectionData(null)}
           onUnlockClue={(clueId) => {
             gameState.unlockClue(clueId);
+            const hotspot = activeInspectionData?.hotspots.find((item) => item.unlocksClueId === clueId);
+            if (activeInspectionData && hotspot) gameState.recordInvestigation({
+              id: `inspection_${clueId}`,
+              title: `${activeInspectionData.title} — ${hotspot.label}`,
+              category: 'evidence',
+              summary: `${activeInspectionData.subtitle}. ${hotspot.observationBasic} ${hotspot.observationDetailed ?? ''}`.trim(),
+              time: activeInspectionData.dateStr,
+            });
             gameState.saveGame();
           }}
         />

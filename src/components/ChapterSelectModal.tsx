@@ -50,6 +50,7 @@ export const ChapterSelectModal: React.FC<ChapterSelectModalProps> = ({
           {chapters.map((ch) => {
             const isUnlocked = ch.isUnlocked;
             const isCurrent = ch.number === currentChapter;
+            const moments = ch.number === 1 ? ['03:17 · O despertar', '07:00 · Os sete relógios', '18:07 · O retorno para casa'] : ['A pista que não deveria existir', 'Uma memória fora do lugar', 'O próximo passo da investigação'];
 
             return (
               <div
@@ -62,8 +63,9 @@ export const ChapterSelectModal: React.FC<ChapterSelectModalProps> = ({
                     : 'border-neutral-900 bg-black/40 opacity-50'
                 }`}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
+                <div className="flex flex-col gap-4 sm:flex-row">
+                  <img src={`/images/pin_${((ch.number - 1) % 5) + 1}.jpg`} alt="" className="h-32 w-full rounded object-cover opacity-80 sm:h-36 sm:w-56" />
+                  <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-red-500 uppercase tracking-widest">
                         CAPÍTULO {ch.number}
@@ -83,6 +85,7 @@ export const ChapterSelectModal: React.FC<ChapterSelectModalProps> = ({
                     <p className="text-xs text-neutral-400 font-serif-jp leading-relaxed pt-1">
                       {isUnlocked ? ch.description : 'Arquivo confidencial. Progrida na investigação para revelar as transcrições deste capítulo.'}
                     </p>
+                    <div className="flex flex-wrap gap-2 pt-3">{moments.map((moment) => <span key={moment} className="border border-neutral-700/70 bg-black/30 px-2 py-1 text-[10px] tracking-wide text-neutral-400">{moment}</span>)}</div>
                   </div>
 
                   <div className="shrink-0 flex items-center">

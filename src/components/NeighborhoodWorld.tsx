@@ -25,6 +25,13 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
   const mountRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLButtonElement>(null);
   const enterSchoolRef = useRef<() => void>(() => {});
+  const zoomRef = useRef(0);
+  const [zoomLevel, setZoomLevel] = React.useState(0);
+  const setZoom = (value: number) => {
+    const next = THREE.MathUtils.clamp(value, 0, 2);
+    zoomRef.current = next;
+    setZoomLevel(next);
+  };
   const live = useRef({ paused, cameraMotionEnabled, direction, onProgress, onMonologue, monologues, onArriveSchool, onArriveHome });
   useEffect(() => {
     live.current = { paused, cameraMotionEnabled, direction, onProgress, onMonologue, monologues, onArriveSchool, onArriveHome };
@@ -42,15 +49,15 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
     renderer.setSize(Math.max(1, mount.clientWidth), Math.max(1, mount.clientHeight));
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.86;
+    renderer.toneMappingExposure = 0.96;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x8b95a2);
-    scene.fog = new THREE.FogExp2(0x97a2ae, 0.022);
-    scene.add(new THREE.HemisphereLight(0xc3d0de, 0x2f333a, 1.0));
-    const sun = new THREE.DirectionalLight(0xdfdcd0, 0.6);
+    scene.fog = new THREE.FogExp2(0x97a2ae, 0.019);
+    scene.add(new THREE.HemisphereLight(0xd6e4f0, 0x302b2a, 1.12));
+    const sun = new THREE.DirectionalLight(0xffe3bd, 0.78);
     sun.position.set(-6, 12, 9);
     scene.add(sun);
 
@@ -60,7 +67,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
     const camera = new THREE.PerspectiveCamera(44, mount.clientWidth / mount.clientHeight, 0.1, 140);
     const startX = direction === 'home' ? STREET.maxX - 3.5 : STREET.minX + 1.5;
     const pos = new THREE.Vector3(startX, 0, walkZ(startX));
-    const rig = new ExplorationCamera(camera, pos, 0, { height: 4.4, distance: 7.6, look: 0.62 });
+    const rig = new ExplorationCamera(camera, pos, 0, { height: 4.4, distance: 7.6, look: 0.62, zoomScale: [1, 0.76, 0.56], zoomHeightScale: [1, 0.84, 0.68] });
 
     const keys: Record<string, boolean> = {};
     let character: ReturnType<typeof createGabrielaSprite> | null = null;
@@ -107,6 +114,8 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
         e.preventDefault();
         enterSchool();
       }
+      if (k === '+' || k === '=') setZoom(zoomRef.current + 1);
+      if (k === '-' || k === '_') setZoom(zoomRef.current - 1);
       if (k.startsWith('arrow')) e.preventDefault();
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -117,9 +126,14 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
         keys[k] = false;
       });
     };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom(zoomRef.current + (e.deltaY < 0 ? 1 : -1));
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    mount.addEventListener('wheel', onWheel, { passive: false });
 
     const clock = new THREE.Timer();
     clock.connect(document);
@@ -178,7 +192,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
       }
       shadow.position.set(pos.x, 0.118, pos.z);
 
-      rig.update(pos, vx, vz, dt, t, 0, live.current.cameraMotionEnabled, locked);
+      rig.update(pos, vx, vz, dt, t, zoomRef.current, live.current.cameraMotionEnabled, locked);
 
       // Monologues are keyed to real street coordinates; the walk home reads
       // them in reverse so the reflections still follow the journey.
@@ -227,6 +241,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      mount.removeEventListener('wheel', onWheel);
       window.removeEventListener('resize', resize);
       character?.dispose();
       street.dispose();
@@ -241,6 +256,10 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div ref={mountRef} className="h-full w-full" />
+      <div className="absolute right-5 bottom-24 z-20 flex flex-col gap-2" aria-label="Zoom da câmera">
+        <button type="button" onClick={() => setZoom(zoomLevel + 1)} disabled={zoomLevel >= 2} aria-label="Aproximar câmera" className="grid h-10 w-10 place-items-center border border-white/30 bg-black/65 text-xl text-white backdrop-blur-sm transition hover:bg-black/85 disabled:opacity-35">+</button>
+        <button type="button" onClick={() => setZoom(zoomLevel - 1)} disabled={zoomLevel <= 0} aria-label="Afastar câmera" className="grid h-10 w-10 place-items-center border border-white/30 bg-black/65 text-xl text-white backdrop-blur-sm transition hover:bg-black/85 disabled:opacity-35">−</button>
+      </div>
       <button ref={promptRef} hidden onClick={() => enterSchoolRef.current()} className="absolute left-1/2 top-[38%] -translate-x-1/2 proximity-prompt pointer-events-auto">
         <span className="proximity-dot" />
         <span className="proximity-caption">
