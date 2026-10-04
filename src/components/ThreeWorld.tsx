@@ -613,10 +613,10 @@ export const ThreeWorld: React.FC<ThreeWorldProps> = (props) => {
       <button disabled={locked || props.canUseStairs === false} onClick={() => changeFloor(currentFloor === 1 ? 2 : 1)} className="absolute bottom-5 right-5 z-20 hud-btn text-[11px] font-serif-jp tracking-widest px-3 w-auto disabled:opacity-30" title="Usar escadas">
         {currentFloor === 1 ? '▲ 2º ANDAR' : '▼ TÉRREO'}
       </button>
-      <button disabled={locked} onClick={interact} className="touch-only absolute bottom-[4.5rem] right-5 z-20 min-h-11 items-center justify-center rounded-full border border-white/25 bg-black/70 px-4 font-serif-jp text-[10px] tracking-[0.15em] text-white shadow-xl backdrop-blur-md disabled:opacity-40">INTERAGIR</button>
+      <button disabled={locked} onClick={interact} className="touch-only mobile-interact absolute bottom-[4.5rem] right-5 z-20 min-h-11 items-center justify-center rounded-full border border-white/25 bg-black/70 px-4 font-serif-jp text-[10px] tracking-[0.15em] text-white shadow-xl backdrop-blur-md disabled:opacity-40">INTERAGIR</button>
 
       {/* Touch controls */}
-      <div className="touch-only absolute bottom-5 left-5 z-20 flex-col items-center gap-1 select-none">
+      <div className="touch-only mobile-touch-controls absolute bottom-5 left-5 z-20 flex-col items-center gap-1 select-none">
         <button className="dpad" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setKey('w', true); }} onPointerUp={() => setKey('w', false)} onPointerCancel={() => setKey('w', false)} onLostPointerCapture={() => setKey('w', false)}>▲</button>
         <div className="flex gap-1">
           <button className="dpad" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setKey('a', true); }} onPointerUp={() => setKey('a', false)} onPointerCancel={() => setKey('a', false)} onLostPointerCapture={() => setKey('a', false)}>◀</button>

@@ -271,16 +271,22 @@ export const useGameState = () => {
       revealedTiers: 1,
       timeAssociated: entry.time,
     }]);
-    setEvidenceNodes((prev) => prev.some((node) => node.id === nodeId) ? prev : [...prev, {
-      id: nodeId,
-      title: entry.title,
-      category: entry.category,
-      x: 150 + (prev.length % 4) * 235,
-      y: 510 + Math.floor((prev.length - INITIAL_EVIDENCE_NODES.length) / 4) * 155,
-      summary: entry.summary,
-      time: entry.time,
-      isUnlocked: true,
-    }]);
+    setEvidenceNodes((prev) => {
+      if (prev.some((node) => node.id === nodeId)) return prev;
+      const isPcEvidence = entry.id.startsWith('pc_');
+      const pcCount = prev.filter((node) => node.sector === 9).length;
+      return [...prev, {
+        id: nodeId,
+        title: entry.title,
+        category: entry.category,
+        x: isPcEvidence ? 30 + (pcCount % 3) * 245 : 150 + (prev.length % 4) * 235,
+        y: isPcEvidence ? 125 + Math.floor(pcCount / 3) * 165 : 510 + Math.floor((prev.length - INITIAL_EVIDENCE_NODES.length) / 4) * 155,
+        summary: entry.summary,
+        time: entry.time,
+        isUnlocked: true,
+        ...(isPcEvidence ? { sector: 9 } : {}),
+      }];
+    });
     const note = entry.note ?? `${entry.category === 'people' ? 'Pessoa' : entry.category === 'location' ? 'Local visitado' : 'Descoberta'}: ${entry.title}. ${entry.summary}`;
     setNotes((prev) => prev.includes(note) ? prev : [note, ...prev]);
   }, []);
@@ -308,6 +314,21 @@ export const useGameState = () => {
 
   const moveEvidenceNode = useCallback((nodeId: string, x: number, y: number) => {
     setEvidenceNodes((prev) => prev.map((n) => (n.id === nodeId ? { ...n, x, y } : n)));
+  }, []);
+
+  const assignEvidenceNode = useCallback((nodeId: string, sector: number) => {
+    setEvidenceNodes((prev) => {
+      const inSector = prev.filter((n) => n.sector === sector && n.id !== nodeId).length;
+      return prev.map((n) => n.id === nodeId ? { ...n, sector, x: 30 + (inSector % 3) * 245, y: 125 + Math.floor(inSector / 3) * 165 } : n);
+    });
+  }, []);
+
+  const addCustomEvidence = useCallback((title: string, summary: string) => {
+    const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const nodeId = `node_${id}`;
+    setEvidenceNodes((prev) => [...prev, { id: nodeId, title, summary, category: 'evidence', x: 0, y: 0, isUnlocked: true, isCustom: true }]);
+    setNotes((prev) => [`Anotação própria — ${title}: ${summary}`, ...prev]);
+    return nodeId;
   }, []);
 
   const checkHasSave = useCallback((slot?: number): boolean => {
@@ -364,6 +385,8 @@ export const useGameState = () => {
     connectEvidenceNodes,
     removeEvidenceConnection,
     moveEvidenceNode,
+    assignEvidenceNode,
+    addCustomEvidence,
     checkHasSave,
     selectChapter,
   };

@@ -289,6 +289,7 @@ export default function Chat(_: { win: WindowState }) {
 }
 
 function Bubble({ msg, dark, contact }: { msg: ChatMessage; dark?: boolean; contact: string }) {
+  const os = useOS();
   const mine = msg.sender === 'me';
   const contentRef = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
@@ -320,6 +321,12 @@ function Bubble({ msg, dark, contact }: { msg: ChatMessage; dark?: boolean; cont
         }`}
       >
         <div ref={contentRef} className="os-readable whitespace-pre-wrap break-words cursor-text">{msg.text}</div>
+        {msg.attachment?.type === 'image' && (
+          <button onClick={() => msg.attachment?.fileId && os.openFile(msg.attachment.fileId)} className="mt-2 block max-w-full overflow-hidden rounded-lg border border-white/15 bg-black/10 text-left" aria-label={`Abrir imagem ${msg.attachment.name} em Downloads`}>
+            <img src={msg.attachment.src} alt="QR code enviado pelo Usuário Oculto" className="max-h-52 w-auto max-w-full bg-white object-contain p-2" />
+            <span className="block px-2 py-1 text-[10px] opacity-70">{msg.attachment.name} · Abrir imagem baixada</span>
+          </button>
+        )}
         {msg.timestamp && <div className={`text-[10px] mt-1 text-right ${mine ? 'text-white/60' : dark ? 'text-white/30' : 'text-slate-400'}`}>{msg.timestamp}{mine && ' · entregue'}</div>}
       </div>
       <button

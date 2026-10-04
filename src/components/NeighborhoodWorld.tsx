@@ -279,7 +279,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
         <button type="button" onClick={() => setZoom(zoomLevel + 1)} disabled={zoomLevel >= 2} aria-label="Aproximar câmera" className="grid h-10 w-10 place-items-center border border-white/30 bg-black/65 text-xl text-white backdrop-blur-sm transition hover:bg-black/85 disabled:opacity-35">+</button>
         <button type="button" onClick={() => setZoom(zoomLevel - 1)} disabled={zoomLevel <= 0} aria-label="Afastar câmera" className="grid h-10 w-10 place-items-center border border-white/30 bg-black/65 text-xl text-white backdrop-blur-sm transition hover:bg-black/85 disabled:opacity-35">−</button>
       </div>
-      <div className="touch-only absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-30 flex-col items-center gap-1 select-none" aria-label="Controles de movimento">
+      <div className="touch-only mobile-touch-controls absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-4 z-30 flex-col items-center gap-1 select-none" aria-label="Controles de movimento">
         <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => pressTouchKey(event, 'w')} onPointerUp={() => releaseTouchKey('w')} onPointerCancel={() => releaseTouchKey('w')} onLostPointerCapture={() => releaseTouchKey('w')} aria-label="Andar para frente">▲</button>
         <div className="flex gap-1">
           <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => pressTouchKey(event, 'a')} onPointerUp={() => releaseTouchKey('a')} onPointerCancel={() => releaseTouchKey('a')} onLostPointerCapture={() => releaseTouchKey('a')} aria-label="Andar para esquerda">◀</button>
@@ -287,7 +287,7 @@ export const NeighborhoodWorld: React.FC<Props> = ({ paused, cameraMotionEnabled
           <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => pressTouchKey(event, 'd')} onPointerUp={() => releaseTouchKey('d')} onPointerCancel={() => releaseTouchKey('d')} onLostPointerCapture={() => releaseTouchKey('d')} aria-label="Andar para direita">▶</button>
         </div>
       </div>
-      <button ref={touchInteractRef} hidden onClick={() => enterSchoolRef.current()} className="touch-only absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 min-h-12 items-center justify-center rounded-full border border-red-100/45 bg-black/75 px-5 font-serif-jp text-[10px] tracking-[0.16em] text-white shadow-xl backdrop-blur-md">INTERAGIR</button>
+      <button ref={touchInteractRef} hidden onClick={() => enterSchoolRef.current()} className="touch-only mobile-interact absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 min-h-12 items-center justify-center rounded-full border border-red-100/45 bg-black/75 px-5 font-serif-jp text-[10px] tracking-[0.16em] text-white shadow-xl backdrop-blur-md">INTERAGIR</button>
       <button ref={promptRef} hidden onClick={() => enterSchoolRef.current()} className="absolute left-1/2 top-[38%] -translate-x-1/2 proximity-prompt pointer-events-auto">
         <span className="proximity-dot" />
         <span className="proximity-caption">

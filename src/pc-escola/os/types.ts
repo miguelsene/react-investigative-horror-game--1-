@@ -95,6 +95,7 @@ export interface ChatMessage {
   sender: 'me' | 'contact';
   text: string;
   timestamp: string;
+  attachment?: { type: 'image'; src: string; name: string; fileId?: string };
 }
 
 export interface ChatThread {

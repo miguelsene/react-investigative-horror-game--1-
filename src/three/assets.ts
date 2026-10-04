@@ -34,13 +34,8 @@ export const preloadAssets = (onProgress?: (p: number) => void): Promise<void> =
       '/images/menu_bg.jpg', '/images/op_logo.png', '/images/gabriela_sheet.png', '/images/vovo.png',
       '/images/vovo_avental.png', '/images/silhueta.png',
       '/images/pin_1.jpg', '/images/pin_2.jpg', '/images/pin_3.jpg', '/images/pin_4.jpg', '/images/pin_5.jpg',
-      '/pc-escola/images/artes.jpg', '/pc-escola/images/biblioteca.jpg', '/pc-escola/images/chuva.jpg',
-      '/pc-escola/images/escola.jpg', '/pc-escola/images/kyoto.jpg', '/pc-escola/images/laboratorio.jpg',
-      '/pc-escola/images/sala_informatica.jpg', '/pc-escola/images/wallpaper.jpg', '/pc-escola/images/watson.jpg',
-      '/pc-escola/images/win7_wallpaper.jpg',
     ];
-    const audioFiles = ['/musicas/trilha_home.mp3', '/musicas/manha.mp3', '/musicas/escola.mp3', '/musicas/sonho.mp3', '/musicas/combate_sono.mp3'];
-    const total = keys.length + 1 + images.length + audioFiles.length;
+    const total = keys.length + 1 + images.length;
     let done = 0;
     const tick = () => {
       done++;
@@ -71,18 +66,6 @@ export const preloadAssets = (onProgress?: (p: number) => void): Promise<void> =
       im.onload = () => tick();
       im.onerror = () => tick();
       im.src = src;
-    });
-    audioFiles.forEach((src) => {
-      fetch(src, { cache: 'force-cache' })
-        .then((response) => {
-          if (!response.ok) throw new Error(`Falha ao carregar ${src}: ${response.status}`);
-          return response.arrayBuffer();
-        })
-        .then(() => tick())
-        .catch((error) => {
-          console.warn('Asset de áudio indisponível durante o carregamento:', src, error);
-          tick();
-        });
     });
   });
   return preloadPromise;

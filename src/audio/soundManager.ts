@@ -401,6 +401,27 @@ class SoundManager {
   private musicOverlayGain: GainNode | null = null;
   private musicOverlayLoadId = 0;
   private musicOverlayUrl: string | null = null;
+  private musicUrl: string | null = null;
+  private transitionId = 0;
+  private musicBuffers = new Map<string, AudioBuffer>();
+  private musicLoads = new Map<string, Promise<AudioBuffer>>();
+
+  private loadMusicBuffer(url: string): Promise<AudioBuffer> {
+    const cached = this.musicBuffers.get(url);
+    if (cached) return Promise.resolve(cached);
+    const pending = this.musicLoads.get(url);
+    if (pending) return pending;
+    const request = fetch(url, { cache: 'force-cache' })
+      .then((response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.arrayBuffer(); })
+      .then((data) => new Promise<AudioBuffer>((resolve, reject) => {
+        if (!this.ctx) { reject(new Error('AudioContext indisponível')); return; }
+        this.ctx.decodeAudioData(data, resolve, reject);
+      }))
+      .then((buffer) => { this.musicBuffers.set(url, buffer); return buffer; })
+      .finally(() => this.musicLoads.delete(url));
+    this.musicLoads.set(url, request);
+    return request;
+  }
 
   /** Plays a second looping music layer through the shared music bus. */
   public setMusicOverlayFile(url: string, volume = 0.42) {
@@ -458,6 +479,8 @@ class SoundManager {
 
   public setMusicFile(url: string) {
     if (!this.ctx || !this.musicGain) return;
+    if (this.musicUrl === url && this.musicOn) return;
+    this.musicUrl = url;
     const loadId = ++this.musicLoadId;
     // Stop current music if playing
     this.stopMusic();
@@ -471,24 +494,12 @@ class SoundManager {
     }, 5000);
     
     // Load new music file
-    fetch(url)
-      .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
-        return response.arrayBuffer();
-      })
-      .then(arrayBuffer => {
+    this.loadMusicBuffer(url)
+      .then((buffer) => {
         if (loadId !== this.musicLoadId) return;
         clearTimeout(loadTimeout);
-        this.ctx!.decodeAudioData(arrayBuffer, (buffer) => {
-          if (loadId !== this.musicLoadId) return;
-          this.musicBuffer = buffer;
-          this.playMusicBuffer();
-        }, () => {
-          if (loadId !== this.musicLoadId) return;
-          clearTimeout(loadTimeout);
-          console.warn('Failed to decode audio file:', url, '- using procedural');
-          this.startMusic(); // Fallback to procedural
-        });
+        this.musicBuffer = buffer;
+        this.playMusicBuffer();
       })
       .catch(err => {
         if (loadId !== this.musicLoadId) return;
@@ -500,19 +511,34 @@ class SoundManager {
 
   /** Gently fades the current track before loading the next loop. */
   public transitionMusicFile(url: string, duration = 650) {
-    if (!this.ctx || !this.musicSource || !this.musicFadeGain) {
-      this.setMusicFile(url);
-      return;
-    }
+    if (!this.ctx || !this.musicGain || (this.musicUrl === url && this.musicOn)) return;
+    this.musicUrl = url;
+    const id = ++this.transitionId;
     const oldSource = this.musicSource;
     const oldGain = this.musicFadeGain;
-    const now = this.ctx.currentTime;
-    oldGain.gain.cancelScheduledValues(now);
-    oldGain.gain.setValueAtTime(Math.max(oldGain.gain.value, 0.0001), now);
-    oldGain.gain.exponentialRampToValueAtTime(0.0001, now + duration / 1000);
-    window.setTimeout(() => {
-      if (this.musicSource === oldSource) this.setMusicFile(url);
-    }, duration);
+    this.loadMusicBuffer(url).then((buffer) => {
+      if (id !== this.transitionId || !this.ctx || !this.musicGain) return;
+      this.musicBuffer = buffer;
+      const now = this.ctx.currentTime;
+      const source = this.ctx.createBufferSource();
+      const gain = this.ctx.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      gain.gain.setValueAtTime(0.0001, now);
+      source.connect(gain);
+      gain.connect(this.musicGain);
+      source.start();
+      gain.gain.exponentialRampToValueAtTime(1, now + duration / 1000);
+      if (oldGain && oldSource) {
+        oldGain.gain.cancelScheduledValues(now);
+        oldGain.gain.setValueAtTime(Math.max(oldGain.gain.value, 0.0001), now);
+        oldGain.gain.exponentialRampToValueAtTime(0.0001, now + duration / 1000);
+        window.setTimeout(() => { try { oldSource.stop(); oldSource.disconnect(); oldGain.disconnect(); } catch {} }, duration + 30);
+      }
+      this.musicSource = source;
+      this.musicFadeGain = gain;
+      this.musicOn = true;
+    }).catch((error) => { if (id === this.transitionId) console.warn('Failed to load music file:', url, error); });
   }
 
   private playMusicBuffer() {
@@ -646,6 +672,8 @@ class SoundManager {
   }
 
   public stopMusic() {
+    this.transitionId++;
+    this.musicUrl = null;
     this.musicOn = false;
     if (this.musicSource) {
       try {

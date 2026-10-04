@@ -39,6 +39,9 @@ export const App: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<'main_menu' | 'gameplay' | 'combat'>('main_menu');
   const [activeInspectionData, setActiveInspectionData] = useState<InspectionObjectData | null>(null);
   const [isEvidenceBoardOpen, setIsEvidenceBoardOpen] = useState(false);
+  useEffect(() => {
+    if (isEvidenceBoardOpen) gameState.saveGame();
+  }, [isEvidenceBoardOpen, gameState.evidenceNodes, gameState.evidenceConnections, gameState.saveGame]);
   const [isJournalOpen, setIsJournalOpen] = useState(false);
   const [isInventoryOpen, setIsInventoryOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -213,10 +216,9 @@ export const App: React.FC = () => {
     const previous = previousAreaRef.current;
     previousAreaRef.current = worldArea;
     if (!previous || previous === worldArea) return;
-    if (worldArea === 'school' || worldArea === 'dream') { setAreaCutscene(null); return; }
     setAreaCutscene(worldArea);
     if (areaCutsceneTimerRef.current) window.clearTimeout(areaCutsceneTimerRef.current);
-    areaCutsceneTimerRef.current = window.setTimeout(() => setAreaCutscene(null), 3400);
+    areaCutsceneTimerRef.current = window.setTimeout(() => setAreaCutscene(null), 6200);
     return () => {
       if (areaCutsceneTimerRef.current) window.clearTimeout(areaCutsceneTimerRef.current);
     };
@@ -466,14 +468,17 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (!isSchoolPcOpen) return;
     const discoveries = [
-      ['pc_yamantaka', pcLore.yamantakaSearched, 'Busca por Yamāntaka', 'A pesquisa no computador liga Yamāntaka às histórias do estranho contato que encontrou Gabriela.'],
-      ['pc_blog', pcLore.sawBlog, 'Blog Midnight Darshana', 'O blog apresenta relatos sobre aparições e a hora 03:17, tratados como folclore na internet.'],
-      ['pc_forum', pcLore.sawForum, 'Fórum e correção dos relatos', 'Uma discussão confronta os relatos do blog e mostra que parte dos registros foi alterada.'],
-      ['pc_archive', pcLore.sawArchive, 'Arquivo escolar — mesa 17', 'O arquivo da escola guarda um registro ligado à mesa 17 e a um padrão que reaparece nas pesquisas.'],
-      ['pc_notebook', pcLore.readNotebook, 'Caderno digital de 1998', 'As anotações encontradas no computador descrevem ocorrências antigas e um método que foi corrigido.'],
+      ['pc_yamantaka', pcLore.yamantakaSearched, 'Busca por Yamāntaka', 'A pesquisa no computador liga Yamāntaka às histórias do estranho contato que encontrou Gabriela.', 'A busca registra o termo ligado à figura encontrada por Gabriela. É uma associação de pesquisa, ainda sem prova de que a entidade e os relatos sejam a mesma coisa.'],
+      ['pc_blog', pcLore.sawBlog, 'Blog Midnight Darshana', 'O blog apresenta relatos sobre aparições e a hora 03:17, tratados como folclore na internet.', 'O horário 03:17 aparece em relatos publicados por pessoas diferentes. Como o blog é uma fonte informal, os relatos precisam ser confrontados com registros verificáveis.'],
+      ['pc_forum', pcLore.sawForum, 'Fórum e correção dos relatos', 'Uma discussão confronta os relatos do blog e mostra que parte dos registros foi alterada.', 'A discussão preserva versões divergentes dos mesmos relatos. A correção posterior muda detalhes, então a versão original também é uma pista.'],
+      ['pc_archive', pcLore.sawArchive, 'Arquivo escolar — mesa 17', 'O arquivo da escola guarda um registro ligado à mesa 17 e a um padrão que reaparece nas pesquisas.', 'O dado escolar aproxima o número 17 das ocorrências pesquisadas. É um registro institucional independente dos relatos online.'],
+      ['pc_notebook', pcLore.readNotebook, 'Caderno digital de 1998', 'As anotações encontradas no computador descrevem ocorrências antigas e um método que foi corrigido.', 'As notas de 1998 mostram que alguém já comparava ocorrências e revisava o método. A sequência de correções pode indicar quais conclusões foram descartadas.'],
     ] as const;
-    discoveries.forEach(([id, found, title, summary]) => {
-      if (found) gameState.recordInvestigation({ id, title, category: 'evidence', summary, note: `PC Escola — ${title}: ${summary}` });
+    discoveries.forEach(([id, found, title, summary, detail]) => {
+      if (found) {
+        gameState.recordInvestigation({ id, title, category: 'evidence', summary, note: `PC Escola — ${title}: ${summary}` });
+        gameState.recordInvestigation({ id: `${id}_analise`, title: `Análise: ${title}`, category: 'evidence', summary: detail, note: `Análise de Gabriela — ${title}: ${detail}` });
+      }
     });
     pcLore.visitedPages.forEach((url, index) => {
       if (!/midnight-darshana|dharma-forum|memoria\.higashi-school/i.test(url)) return;
@@ -942,11 +947,13 @@ export const App: React.FC = () => {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden select-none bg-black text-neutral-200">
-      {activeScreen === 'gameplay' && worldArea !== 'house' && worldArea !== 'dream' && !anyModal && !activeDialogueNode && !streetThought && (
-        <div className="touch-only fixed right-3 top-14 z-[80] flex-row gap-1.5 rounded-full border border-white/15 bg-black/65 p-1.5 shadow-xl backdrop-blur-md" aria-label="Ferramentas da investigação">
-          <button className="grid min-h-10 min-w-10 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir inventário" onClick={() => { setIsInventoryOpen(true); setIsJournalOpen(false); setIsEvidenceBoardOpen(false); }}><Package className="h-4 w-4" /></button>
-          <button className="grid min-h-10 min-w-10 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir diário" onClick={() => { setIsJournalOpen(true); setIsInventoryOpen(false); setIsEvidenceBoardOpen(false); }}><BookMarked className="h-4 w-4" /></button>
-          <button className="grid min-h-10 min-w-10 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir quadro de pistas" onClick={() => { setIsEvidenceBoardOpen(true); setIsInventoryOpen(false); setIsJournalOpen(false); }}><GitFork className="h-4 w-4" /></button>
+      {activeScreen === 'gameplay' && !anyModal && !activeDialogueNode && !streetThought && !areaCutscene && (
+        <div className="touch-only mobile-game-dock fixed right-2 top-[calc(env(safe-area-inset-top)+3.5rem)] z-[80] flex-row gap-1 rounded-full border border-white/15 bg-black/75 p-1 shadow-xl backdrop-blur-md" aria-label="Ferramentas da investigação">
+          <button className="grid min-h-9 min-w-9 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir inventário" onClick={() => { soundManager.playClockTick(); setIsInventoryOpen(true); setIsJournalOpen(false); setIsEvidenceBoardOpen(false); setIsSettingsOpen(false); }}><Package className="h-4 w-4" /></button>
+          <button className="grid min-h-9 min-w-9 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir diário" onClick={() => { soundManager.playClockTick(); setIsJournalOpen(true); setIsInventoryOpen(false); setIsEvidenceBoardOpen(false); setIsSettingsOpen(false); }}><BookMarked className="h-4 w-4" /></button>
+          <button className="grid min-h-9 min-w-9 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir quadro de pistas" onClick={() => { soundManager.playClockTick(); setIsEvidenceBoardOpen(true); setIsInventoryOpen(false); setIsJournalOpen(false); setIsSettingsOpen(false); }}><GitFork className="h-4 w-4" /></button>
+          <button className="grid min-h-9 min-w-9 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Abrir menu" onClick={() => { soundManager.playClockTick(); setIsSettingsOpen(true); setIsInventoryOpen(false); setIsJournalOpen(false); setIsEvidenceBoardOpen(false); }}><Menu className="h-4 w-4" /></button>
+          {gameState.storyFlags.developer_mode && <button className="grid min-h-9 min-w-9 place-items-center rounded-full text-neutral-100 active:bg-white/15" aria-label="Alterar momento" onClick={() => { soundManager.playClockTick(); setDevPanelOpen(true); }}><Clock3 className="h-4 w-4" /></button>}
         </div>
       )}
       {activeScreen === 'main_menu' && (
@@ -972,7 +979,7 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {activeScreen === 'gameplay' && worldArea !== 'house' && gameState.storyFlags.developer_mode && <button className="hud-btn fixed right-5 top-5 z-[80] flex items-center gap-2" title="Alterar momento [T]" onClick={() => { soundManager.playClockTick(); setDevPanelOpen(true); }}><Clock3 className="h-4 w-4" /><span className="font-serif-jp text-[9px] tracking-[.2em]">MOMENTO · T</span></button>}
+      {activeScreen === 'gameplay' && worldArea !== 'house' && gameState.storyFlags.developer_mode && <button className="developer-hud-button hud-btn fixed right-5 top-5 z-[80] flex items-center gap-2" title="Alterar momento [T]" onClick={() => { soundManager.playClockTick(); setDevPanelOpen(true); }}><Clock3 className="h-4 w-4" /><span className="font-serif-jp text-[9px] tracking-[.2em]">MOMENTO · T</span></button>}
 
       {/* Developer Quick-Jump Panel */}
       {devPanelOpen && (
@@ -1076,7 +1083,7 @@ export const App: React.FC = () => {
           </div>
 
           {/* Minimal HUD — actions */}
-          <div className="absolute top-5 right-5 z-20 flex items-center gap-2">
+          <div className="desktop-house-actions absolute top-5 right-5 z-20 flex items-center gap-2">
             {gameState.saveStatus !== 'idle' && (
               <span className="mr-2 flex items-center gap-1.5 font-serif-jp text-[10px] tracking-[0.3em] text-neutral-400 uppercase hud-shadow fade-up">
                 {gameState.saveStatus === 'saving' ? <Save className="w-3 h-3 animate-pulse" /> : <Check className="w-3 h-3 text-emerald-400" />}
@@ -1408,8 +1415,8 @@ export const App: React.FC = () => {
         return <div className="area-cutscene-curtain pointer-events-none fixed inset-0 z-[85] overflow-hidden text-center" aria-live="polite"><div className="area-cutscene-bar absolute inset-x-0 top-0 h-[12vh] bg-gradient-to-b from-black/90 to-transparent" /><div className="area-cutscene-bar area-cutscene-bar-bottom absolute inset-x-0 bottom-0 h-[22vh] bg-gradient-to-t from-black/95 via-black/55 to-transparent" /><div className="area-cutscene-card absolute inset-x-4 bottom-[7vh] mx-auto max-w-xl px-4 pb-2 sm:bottom-[8vh]"><span className="font-mono text-[8px] tracking-[.45em] text-rose-200/85 sm:text-[9px] sm:tracking-[.55em]">QUEM É VOCÊ? · CAPÍTULO 01</span><h2 className="mt-2 font-title text-2xl tracking-[.2em] text-neutral-100 sm:mt-3 sm:text-4xl">{title}</h2><div className="mx-auto mt-2 h-px w-32 bg-gradient-to-r from-transparent via-rose-200/70 to-transparent sm:mt-3" /><p className="mx-auto mt-2 max-w-md font-serif-jp text-xs leading-5 text-neutral-200/90 sm:mt-3 sm:text-sm sm:leading-7">{line}</p></div></div>;
       })()}
 
-      {activeScreen === 'gameplay' && worldArea !== 'house' && (
-        <div className="fixed top-5 right-5 z-40 flex items-center gap-2">
+      {activeScreen === 'gameplay' && worldArea !== 'house' && worldArea !== 'dream' && (
+        <div className="desktop-area-hud fixed top-5 right-5 z-40 hidden items-center gap-2 sm:flex">
           <button className="hud-btn" title="Inventário [I]" onClick={() => { soundManager.playClockTick(); setIsInventoryOpen(true); }}><Package className="w-4 h-4" /></button>
           <button className="hud-btn relative" title="Diário [J]" onClick={() => { soundManager.playClockTick(); setIsJournalOpen(true); }}><BookMarked className="w-4 h-4" /></button>
           <button className="hud-btn" title="Quadro de pistas [Q]" onClick={() => { soundManager.playClockTick(); setIsEvidenceBoardOpen(true); }}><GitFork className="w-4 h-4" /></button>
@@ -1434,6 +1441,13 @@ export const App: React.FC = () => {
           onMoveNode={(id, x, y) => {
             gameState.moveEvidenceNode(id, x, y);
             gameState.saveGame();
+          }}
+          onAssignNode={(id, sector) => {
+            gameState.assignEvidenceNode(id, sector);
+            gameState.saveGame();
+          }}
+          onAddNote={(title, summary) => {
+            return gameState.addCustomEvidence(title, summary);
           }}
           onClose={() => setIsEvidenceBoardOpen(false)}
         />

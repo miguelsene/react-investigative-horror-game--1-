@@ -96,6 +96,9 @@ export interface EvidenceNode {
   summary: string;
   time?: string;
   isUnlocked: boolean;
+  /** 1-9 position on the investigation board; absent means saved for later. */
+  sector?: number;
+  isCustom?: boolean;
 }
 
 export interface EvidenceConnection {

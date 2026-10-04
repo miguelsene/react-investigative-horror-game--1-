@@ -104,7 +104,6 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, came
       if (disposed) return;
       character = createGabrielaSprite(texture);
       character.sprite.position.set(pos.x, 0, pos.z);
-      character.sprite.scale.x = Math.abs(character.sprite.scale.x) * (povInverted ? -1 : 1);
       scene.add(character.sprite);
     });
 
@@ -168,7 +167,6 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, came
         e.preventDefault();
         povInverted = !povInverted;
         rig.toggleSide();
-        if (character) character.sprite.scale.x = Math.abs(character.sprite.scale.x) * (povInverted ? -1 : 1);
         soundManager.playClockTick();
       }
       if (key === 'e' && !e.repeat) talk();
@@ -257,7 +255,14 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, came
       currentMotionSpeed = Math.hypot(vx, vz);
       const moving = currentMotionSpeed > 0.02;
       if (moving) {
-        facing = Math.abs(vx) > Math.abs(vz) ? (vx > 0 ? 'right' : 'left') : vz > 0 ? 'down' : 'up';
+        // Facing must be expressed in the camera's current frame. Tab reverses
+        // the camera-relative movement axes; applying a second sprite flip here
+        // made the animation look detached from Gabriela's body.
+        const facingVx = povInverted ? -vx : vx;
+        const facingVz = povInverted ? -vz : vz;
+        facing = Math.abs(facingVx) > Math.abs(facingVz)
+          ? (facingVx > 0 ? 'right' : 'left')
+          : facingVz > 0 ? 'down' : 'up';
         frameTime += dt;
         if (frameTime > 0.13) {
           frameTime = 0;
@@ -420,7 +425,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, came
         />
       )}
 
-      <div className="touch-only absolute bottom-4 left-4 z-30 flex-col items-center gap-1 select-none" aria-label="Controles de movimento">
+      <div className="touch-only mobile-touch-controls absolute bottom-4 left-4 z-30 flex-col items-center gap-1 select-none" aria-label="Controles de movimento">
         <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touchKeysRef.current.w = true; }} onPointerUp={() => { touchKeysRef.current.w = false; }} onPointerCancel={() => { touchKeysRef.current.w = false; }} onLostPointerCapture={() => { touchKeysRef.current.w = false; }} aria-label="Andar para frente">▲</button>
         <div className="flex gap-1">
           <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touchKeysRef.current.a = true; }} onPointerUp={() => { touchKeysRef.current.a = false; }} onPointerCancel={() => { touchKeysRef.current.a = false; }} onLostPointerCapture={() => { touchKeysRef.current.a = false; }} aria-label="Andar para esquerda">◀</button>
@@ -428,7 +433,7 @@ export const SchoolWorld: React.FC<Props> = ({ paused, cameraMotionEnabled, came
           <button className="dpad h-12 w-12 rounded-xl bg-black/65 text-lg" onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); touchKeysRef.current.d = true; }} onPointerUp={() => { touchKeysRef.current.d = false; }} onPointerCancel={() => { touchKeysRef.current.d = false; }} onLostPointerCapture={() => { touchKeysRef.current.d = false; }} aria-label="Andar para direita">▶</button>
         </div>
       </div>
-      <button hidden={!hud || !!talkingTo} onClick={() => interactRef.current()} className="touch-only absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 min-h-12 items-center justify-center rounded-full border border-white/25 bg-black/75 px-5 font-serif-jp text-[10px] tracking-[0.16em] text-white shadow-xl backdrop-blur-md">INTERAGIR</button>
+      <button hidden={!hud || !!talkingTo} onClick={() => interactRef.current()} className="touch-only mobile-interact absolute bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-30 min-h-12 items-center justify-center rounded-full border border-white/25 bg-black/75 px-5 font-serif-jp text-[10px] tracking-[0.16em] text-white shadow-xl backdrop-blur-md">INTERAGIR</button>
 
       <div className="absolute bottom-20 right-4 z-20 flex items-center gap-1.5 bg-black/60 border border-neutral-800/80 px-2.5 py-1 rounded-full backdrop-blur-md sm:bottom-5 sm:right-28">
         <button

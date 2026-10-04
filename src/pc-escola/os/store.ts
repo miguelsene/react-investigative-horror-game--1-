@@ -216,7 +216,7 @@ export interface OSState {
 
   updateChat: (contactId: string, patch: Partial<ChatThread>) => void;
   sendChatMessage: (contactId: string, text: string) => void;
-  receiveChat: (contactId: string, text: string) => void;
+  receiveChat: (contactId: string, text: string, attachment?: ChatMessage['attachment']) => void;
   startExam: () => void;
   answerExam: (answer: string) => void;
   unlockChat: (contactId: string) => void;
@@ -677,7 +677,7 @@ export const useOS = create<OSState>()(
         }, delay);
       },
 
-      receiveChat: (contactId, text) => {
+      receiveChat: (contactId, text, attachment) => {
         const s = get();
         const d = new Date();
         const timestamp = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
@@ -686,7 +686,7 @@ export const useOS = create<OSState>()(
         set({
           chats: s.chats.map((c) =>
             c.contactId === contactId
-              ? { ...c, contactStatus: 'online', unread: openHere ? 0 : c.unread + 1, messages: [...c.messages, { id: uid(), sender: 'contact', text, timestamp } as ChatMessage] }
+              ? { ...c, contactStatus: 'online', unread: openHere ? 0 : c.unread + 1, messages: [...c.messages, { id: uid(), sender: 'contact', text, timestamp, ...(attachment ? { attachment } : {}) } as ChatMessage] }
               : c,
           ),
         });
@@ -751,11 +751,23 @@ export const useOS = create<OSState>()(
         } else {
           fileId = get().download({ name: EXAM_PASS_FILE_NAME, type: 'txt', content: EXAM_PASS_FILE_CONTENT }, 'higashi://mensageiro/oculto');
         }
+        const qrSrc = '/images/qr.png';
+        const existingQr = get().files.find((f) => f.name === 'qr.png' && !f.deleted);
+        const qrFileId = existingQr?.id ?? get().download({
+          name: 'qr.png',
+          type: 'image',
+          content: { src: qrSrc, caption: 'QR code enviado pelo Usuário Oculto', taken: '2003-11-14' },
+          size: 'imagem PNG',
+        }, 'higashi://mensageiro/oculto');
+        if (existingQr && !get().downloads.some((d) => d.fileId === existingQr.id)) {
+          set({ downloads: [{ id: uid(), name: existingQr.name, fileId: existingQr.id, url: 'higashi://mensageiro/oculto', date: sceneISO() }, ...get().downloads] });
+        }
         set({
           lore: { ...get().lore, exam: { ...get().lore.exam, sent: true } },
           chats: get().chats.map((c) => c.contactId === 'oculto' ? { ...c, fileSent: true, fileId } : c),
         });
         get().receiveChat('oculto', `Baixe: ${EXAM_PASS_FILE_NAME}\n\nEstá em Downloads. Abra no Editor de Texto quando quiser.`);
+        get().receiveChat('oculto', 'E guarde também este QR code. Salvei a imagem em Downloads.', { type: 'image', src: qrSrc, name: 'qr.png', fileId: qrFileId });
         get().receiveChat('oculto', EXAM_FINAL_MSG);
       },
 
@@ -838,7 +850,7 @@ export const useOS = create<OSState>()(
     }),
     {
       name: 'higashi-os-state-v1',
-      version: 4,
+      version: 5,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Partial<OSState>;
         if (!state) return state;
@@ -898,6 +910,33 @@ export const useOS = create<OSState>()(
             }
             state.chats = (state.chats ?? base.chats).map((c) => c.contactId === 'oculto' ? { ...c, fileSent: true, fileId: file!.id } : c);
             state.lore.exam.sent = true;
+          }
+        }
+        if (version < 5) {
+          const base = initialData();
+          const exam = state.lore?.exam;
+          if (exam?.done && exam.score >= 7) {
+            const files = state.files ?? base.files;
+            let qr = files.find((f) => f.name === 'qr.png' && !f.deleted);
+            if (!qr) {
+              const date = sceneISO();
+              qr = {
+                id: uid(), name: 'qr.png', type: 'image', parentId: DOWNLOADS_ID,
+                content: { src: '/images/qr.png', caption: 'QR code enviado pelo Usuário Oculto', taken: '2003-11-14' },
+                createdAt: date, modifiedAt: date, readOnly: false, deleted: false,
+              };
+              state.files = [...files, qr];
+            }
+            if (!(state.downloads ?? []).some((d) => d.fileId === qr!.id)) {
+              state.downloads = [{ id: uid(), fileId: qr.id, name: qr.name, url: 'higashi://mensageiro/oculto', date: sceneISO() }, ...(state.downloads ?? [])];
+            }
+            const qrFileId = qr.id;
+            state.chats = (state.chats ?? base.chats).map((thread) => {
+              if (thread.contactId !== 'oculto' || thread.messages.some((message) => message.attachment?.name === 'qr.png')) return thread;
+              const now = new Date();
+              const timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+              return { ...thread, messages: [...thread.messages, { id: uid(), sender: 'contact', text: 'E guarde também este QR code. Salvei a imagem em Downloads.', timestamp, attachment: { type: 'image', src: '/images/qr.png', name: 'qr.png', fileId: qrFileId } }] };
+            });
           }
         }
         return state;
