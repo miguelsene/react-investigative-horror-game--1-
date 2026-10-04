@@ -202,6 +202,9 @@ button:focus-visible, input:focus-visible, [tabindex='0']:focus-visible { outlin
 .game-boot-loader { position: fixed; inset: 0; z-index: 10001; display: grid; place-items: center; background: #000; animation: areaLoad .2s ease both; }
 .game-boot-logo { width: min(380px, 68vw); height: auto; opacity: .92; filter: grayscale(1) contrast(.9) brightness(1.45); }
 .game-boot-status { position: absolute; left: 28px; bottom: 24px; display: flex; align-items: center; gap: 10px; color: rgba(235,235,235,.6); font: 10px 'Shippori Mincho', serif; letter-spacing: .28em; text-transform: uppercase; }
+.game-boot-progress { position: absolute; left: 28px; right: 28px; bottom: 51px; height: 2px; overflow: hidden; background: rgba(255,255,255,.16); }
+.game-boot-progress span { display: block; height: 100%; background: linear-gradient(90deg,#71232a,#e8c7b7); box-shadow: 0 0 12px rgba(196,64,72,.55); transition: width .18s ease-out; }
+.game-boot-percent { position: absolute; right: 28px; bottom: 23px; color: rgba(235,235,235,.55); font: 10px 'JetBrains Mono', monospace; letter-spacing: .12em; }
 .game-boot-spinner { width: 17px; height: 17px; border: 1px solid rgba(255,255,255,.18); border-top-color: #ddd; border-radius: 50%; animation: bootSpin .75s linear infinite; }
 @keyframes bootSpin { to { transform: rotate(360deg); } }
 .area-loading { position: fixed; inset: 0; z-index: 10000; display: grid; place-content: center; gap: 13px; color: rgba(240,235,224,.8); background: rgba(5,6,8,.72); font: 10px 'Shippori Mincho', serif; letter-spacing: .42em; text-transform: uppercase; animation: areaLoad .42s ease both; pointer-events: none; }

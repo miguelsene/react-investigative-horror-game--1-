@@ -231,20 +231,26 @@ export const App: React.FC = () => {
     soundManager.setMusicFile('/musicas/manha.mp3');
   }, []);
 
-  const enterGameplay = useCallback((skipLoading = false) => {
-    if (skipLoading) {
-      setActiveScreen('gameplay'); setShowHint(true); setIsStartingGame(false);
-      setTimeout(() => setShowHint(false), 14000);
-      return;
-    }
-    setIsStartingGame(true);
-    const loadingDuration = 4000 + Math.round(Math.random() * 4000);
-    window.setTimeout(() => {
+  const enterGameplay = useCallback((skipLoading = false, afterLoad?: () => void) => {
+    const enter = () => {
       setActiveScreen('gameplay');
       setShowHint(true);
       setIsStartingGame(false);
       setTimeout(() => setShowHint(false), 14000);
-    }, loadingDuration);
+      afterLoad?.();
+    };
+    if (skipLoading) {
+      enter();
+      return;
+    }
+    setIsStartingGame(true);
+    setLoadProgress(0);
+    const startedAt = performance.now();
+    preloadAssets(setLoadProgress).then(() => {
+      const minimumLoadingTime = 650;
+      const remaining = Math.max(0, minimumLoadingTime - (performance.now() - startedAt));
+      window.setTimeout(enter, remaining);
+    });
   }, []);
 
   const enterDeveloperMode = useCallback(() => {
@@ -399,12 +405,13 @@ export const App: React.FC = () => {
         setRepairClockId(null);
         setClockHuntOpen(false);
         lastNoteRef.current = null;
-        enterGameplay(true);
-        setHouseIntro(true);
-        window.setTimeout(() => {
-          setHouseIntro(false);
-          setActiveDialogueNode(DIALOGUE_NODES['prologue_tick_1']);
-        }, 6800);
+        enterGameplay(false, () => {
+          setHouseIntro(true);
+          window.setTimeout(() => {
+            setHouseIntro(false);
+            setActiveDialogueNode(DIALOGUE_NODES['prologue_tick_1']);
+          }, 6800);
+        });
       } else {
         gameState.loadGame(slot);
         enterGameplay();
@@ -956,10 +963,12 @@ export const App: React.FC = () => {
         />
       )}
 
-      {isStartingGame && (
+      {(isStartingGame || (activeScreen === 'main_menu' && !assetsReady)) && (
         <div className="game-boot-loader" role="status" aria-live="polite">
           <img className="game-boot-logo" src="/images/op_logo.png" alt="Ordem Paranormal" />
-          <div className="game-boot-status"><span className="game-boot-spinner" />Carregando</div>
+          <div className="game-boot-status"><span className="game-boot-spinner" />{isStartingGame ? 'Preparando save' : 'Carregando imagens e áudio'}</div>
+          <div className="game-boot-progress" aria-label={`Carregamento ${Math.round(loadProgress * 100)} por cento`}><span style={{ width: `${Math.round(loadProgress * 100)}%` }} /></div>
+          <span className="game-boot-percent">{Math.round(loadProgress * 100)}%</span>
         </div>
       )}
 
